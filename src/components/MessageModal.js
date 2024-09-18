@@ -9,7 +9,7 @@ const MessageModal = ({message, open, onClose}) => {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle>Message Details</DialogTitle>
-            <DialogContent sx={{height: '80vh', display: 'flex', flexDirection: 'column'}}>
+            <DialogContent sx={{display: 'flex', flexDirection: 'column'}}>
                 <Box sx={{mb: 2}}>
                     <Typography variant="subtitle1" gutterBottom>
                         Timestamp: {message.timestamp}
