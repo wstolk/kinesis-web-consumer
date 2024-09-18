@@ -40,7 +40,7 @@ export default function Home() {
             const data = await response.json();
             setMessages(data.records.map(record => ({
                 ...record,
-                timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString(),
+                timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }),
                 partitionKey: record.PartitionKey,
                 data: record.Data,
                 ShardId: record.ShardId || 'N/A'

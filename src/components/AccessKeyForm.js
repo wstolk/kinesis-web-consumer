@@ -14,7 +14,7 @@ const AWS_REGIONS = [
 ];
 
 const SHARD_ITERATOR_TYPES = [
-    "TRIM_HORIZON", "LATEST", "AT_SEQUENCE_NUMBER", "AFTER_SEQUENCE_NUMBER", "AT_TIMESTAMP"
+    "TRIM_HORIZON", "AT_TIMESTAMP"
 ];
 
 const AccessKeyForm = ({onSubmit, isLoading}) => {
@@ -24,6 +24,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
     const [streamName, setStreamName] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [messageLimit, setMessageLimit] = useState(20);
+    const [minutesAgo, setMinutesAgo] = useState(5);
     const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
     const [shardId, setShardId] = useState('');
 
@@ -50,7 +51,8 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
             streamName,
             messageLimit,
             shardIteratorType,
-            shardId: shardId.trim() || undefined
+            minutesAgo,
+            shardId: shardId.trim() || undefined,
         };
 
         // Cache form data in localStorage
@@ -146,6 +148,18 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                         </MenuItem>
                     ))}
                 </TextField>
+                <Collapse in={shardIteratorType === 'AT_TIMESTAMP'}>
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        type="number"
+                        label="Number of minutes ago"
+                        value={minutesAgo}
+                        onChange={(e) => setMinutesAgo(Math.max(1, parseInt(e.target.value) || 1))}
+                        helperText="Number of minutes ago to start fetching (default: 5)"
+                        InputProps={{inputProps: {min: 1}}}
+                    />
+                </Collapse>
                 <TextField
                     fullWidth
                     margin="normal"

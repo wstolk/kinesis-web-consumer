@@ -12,6 +12,7 @@ export default async function handler(req, res) {
             messageLimit = 20,
             shardIteratorType = 'TRIM_HORIZON',
             shardId,
+            minutesAgo,
             useRealKinesis
         } = req.body;
 
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
                     const streamInfo = await describeStream(client, streamName);
                     shardToUse = streamInfo;
                 }
-                const shardIterator = await getShardIterator(client, streamName, shardToUse, shardIteratorType);
+                const shardIterator = await getShardIterator(client, streamName, shardToUse, shardIteratorType, minutesAgo);
                 data = await getRecords(client, shardIterator, messageLimit);
             }
 

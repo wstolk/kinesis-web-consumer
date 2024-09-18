@@ -16,24 +16,31 @@ export const createKinesisClient = (accessKeyId, secretAccessKey, region) => {
     });
 };
 
-export const getShardIterator = async (client, streamName, shardId) => {
+export const getShardIterator = async (client, streamName, shardId, shardIteratorType, minutesAgo) => {
+    let timestamp = null;
+    if (shardIteratorType === "AT_TIMESTAMP") {
+        timestamp = new Date(new Date() - 1000 * 60 * minutesAgo);
+    }
+
     const command = new GetShardIteratorCommand({
         StreamName: streamName,
         ShardId: shardId,
-        ShardIteratorType: 'TRIM_HORIZON',
+        ShardIteratorType: shardIteratorType,
+        Timestamp: timestamp,
     });
 
     const response = await client.send(command);
     return response.ShardIterator;
 };
 
-export const getRecords = async (client, shardIterator) => {
+export const getRecords = async (client, shardIterator, messageLimit) => {
     const command = new GetRecordsCommand({
         ShardIterator: shardIterator,
-        Limit: 100,
+        Limit: messageLimit,
     });
 
     const response = await client.send(command);
+    console.log(response)
     // Parse record Data from base64 to string
     let records = response.Records.map(record => {
         record.Data = JSON.parse(Buffer.from(record.Data).toString('utf8'));
