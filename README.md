@@ -2,7 +2,10 @@
 
 ## Overview
 
-Kinesis Stream Consumer is a web-based application that allows users to connect to and view messages from Amazon Kinesis streams. It provides a user-friendly interface for inputting AWS credentials, connecting to Kinesis streams, and displaying stream data with filtering and sorting capabilities.
+![Kinesis Web Consumer Overview](./media/kinesis_stream_consumer_overview.jpeg)
+
+Kinesis Stream Consumer is a web-based application that allows users to connect to and view messages from Amazon Kinesis streams. 
+It provides a user-friendly interface for inputting AWS credentials, connecting to Kinesis streams, and displaying stream data with filtering and sorting capabilities.
 
 ## Features
 
@@ -13,6 +16,8 @@ Kinesis Stream Consumer is a web-based application that allows users to connect 
 - View detailed message content in a modal
 - Toggle between mock data and real Kinesis data in development mode
 - Caching of form entries for quick reconnection
+
+![Kinesis Web Consumer Data View](./media/kinesis_stream_consumer_data_view.jpeg)
 
 ## Technologies Used
 

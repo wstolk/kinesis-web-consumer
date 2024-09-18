@@ -7,7 +7,7 @@ const generateMockMessage = (shardId) => {
 
     return {
         ApproximateArrivalTimestamp: new Date().getTime(),
-        Data: Buffer.from(JSON.stringify({
+        Data: {
             id: uuidv4(),
             timestamp: new Date().toISOString(),
             eventType: eventType,
@@ -16,7 +16,7 @@ const generateMockMessage = (shardId) => {
                 page: `/page_${Math.floor(Math.random() * 10)}`,
                 duration: Math.floor(Math.random() * 300)
             }
-        })).toString('base64'),
+        },
         PartitionKey: `partition_${Math.floor(Math.random() * 10)}`,
         SequenceNumber: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
         ShardId: shardId
