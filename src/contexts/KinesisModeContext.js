@@ -4,7 +4,7 @@ import React, {createContext, useState, useContext} from 'react';
 const KinesisModeContext = createContext();
 
 export const KinesisModeProvider = ({children}) => {
-    const [useRealKinesis, setUseRealKinesis] = useState(false);
+    const [useRealKinesis, setUseRealKinesis] = useState(true);
 
     return (
         <KinesisModeContext.Provider value={{useRealKinesis, setUseRealKinesis}}>
