@@ -35,12 +35,31 @@ const AuthModal = ({ open, onClose, onSubmit }) => {
         }
     }, []);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const credentials = { accessKeyId, secretAccessKey, sessionToken, region };
-        localStorage.setItem('awsCredentials', JSON.stringify(credentials));
-        onSubmit(credentials);
-        onClose();
+
+        try {
+            const response = await fetch('/api/authenticate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ accessKeyId, secretAccessKey, sessionToken, region }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const credentials = { accessKeyId, secretAccessKey, sessionToken, region };
+                localStorage.setItem('awsCredentials', JSON.stringify(credentials));
+                onSubmit(credentials, data);
+                onClose();
+            } else {
+                console.error(data.message);
+            }
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     return (

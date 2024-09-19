@@ -22,6 +22,7 @@ export default function Home() {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [credentials, setCredentials] = useState(null);
+    const [streams, setStreams] = useState([]);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
@@ -30,6 +31,11 @@ export default function Home() {
         if (savedCredentials) {
             setCredentials(savedCredentials);
             setIsAuthenticated(true);
+
+            const savedStreams = JSON.parse(localStorage.getItem('awsStreams'));
+            if (savedStreams) {
+                setStreams(savedStreams);
+            }
         } else {
             setIsAuthModalOpen(true);
         }
@@ -108,10 +114,17 @@ export default function Home() {
         setIsAuthModalOpen(false);
     };
 
-    const handleAuthSubmit = (newCredentials) => {
+    const handleAuthSubmit = (newCredentials, authResponse) => {
         setCredentials(newCredentials);
         setIsAuthenticated(true);
         setIsAuthModalOpen(false);
+
+        if (authResponse.streams) {
+            setStreams(authResponse.streams);
+
+            // Cache streams in localStorage
+            localStorage.setItem('awsStreams', JSON.stringify(authResponse.streams));
+        }
     };
 
     return (
@@ -129,6 +142,7 @@ export default function Home() {
                 <Sidebar
                     isVisible={sidebarVisible}
                     onSubmit={handleSubmit}
+                    streams={streams}
                     sx={{
                         width: SIDEBAR_WIDTH,
                         flexShrink: 0,

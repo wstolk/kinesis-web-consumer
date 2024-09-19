@@ -4,7 +4,7 @@ import {Drawer, Box} from '@mui/material';
 import AccessKeyForm from './AccessKeyForm';
 import {useTheme} from "@mui/material/styles";
 
-const Sidebar = ({isVisible, onSubmit, sx, isLoading}) => {
+const Sidebar = ({isVisible, onSubmit, sx, isLoading, streams}) => {
     const theme = useTheme();
 
     return (
@@ -20,7 +20,10 @@ const Sidebar = ({isVisible, onSubmit, sx, isLoading}) => {
             }}
         >
             <Box sx={{overflow: 'auto'}} padding={2}>
-                <AccessKeyForm onSubmit={onSubmit} isLoading={isLoading}/>
+                <AccessKeyForm
+                    streams={streams}
+                    onSubmit={onSubmit}
+                    isLoading={isLoading}/>
             </Box>
         </Drawer>
     );

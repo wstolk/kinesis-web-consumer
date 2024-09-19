@@ -17,13 +17,8 @@ const SHARD_ITERATOR_TYPES = [
     "TRIM_HORIZON", "AT_TIMESTAMP"
 ];
 
-const AccessKeyForm = ({onSubmit, isLoading}) => {
-    const [accessKeyId, setAccessKeyId] = useState('');
-    const [secretAccessKey, setSecretAccessKey] = useState('');
-    const [sessionToken, setSessionToken] = useState('');
-    const [region, setRegion] = useState('eu-central-1');
+const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
     const [streamName, setStreamName] = useState('');
-    const [showAuth, setShowAuth] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [messageLimit, setMessageLimit] = useState(50);
     const [minutesAgo, setMinutesAgo] = useState(30);
@@ -36,8 +31,12 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
         if (cachedForm) {
             setStreamName(cachedForm.streamName || '');
             setMessageLimit(cachedForm.messageLimit || 30);
-            setShardIteratorType(cachedForm.shardIteratorType || 'TRIM_HORIZON');
+            setShardIteratorType(cachedForm.shardIteratorType || 'AT_TIMESTAMP');
             setPartitionKey(cachedForm.partitionKey || '');
+        }
+
+        if (streams.length > 0 && !cachedForm.streamName) {
+            setStreamName(streams[0]);
         }
     }, []);
 
@@ -68,15 +67,33 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                 Ensure that your AWS credentials have the necessary permissions to access the specified Kinesis
                 stream.
             </Typography>
-            <TextField
-                fullWidth
-                margin="normal"
-                required
-                label="Kinesis Stream Name"
-                value={streamName}
-                onChange={(e) => setStreamName(e.target.value)}
-                helperText="The name of your Kinesis stream"
-            />
+            {streams.length > 0 ? (
+                <TextField
+                    fullWidth
+                    margin="normal"
+                    select
+                    label="Kinesis Stream Name"
+                    value={streamName}
+                    onChange={(e) => setStreamName(e.target.value)}
+                    helperText="Select the Kinesis stream to connect to"
+                >
+                    {streams.map((stream) => (
+                        <MenuItem key={stream} value={stream}>
+                            {stream}
+                        </MenuItem>
+                    ))}
+                </TextField>
+            ) : (
+                <TextField
+                    fullWidth
+                    margin="normal"
+                    required
+                    label="Kinesis Stream Name"
+                    value={streamName}
+                    onChange={(e) => setStreamName(e.target.value)}
+                    helperText="The name of your Kinesis stream"
+                />
+            )}
             <Box sx={{display: 'flex', alignItems: 'center', mt: 2, mb: 1}}>
                 <Typography variant="subtitle1">Advanced Settings</Typography>
                 <IconButton onClick={() => setShowAdvanced(!showAdvanced)} size="small">
