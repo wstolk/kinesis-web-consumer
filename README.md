@@ -7,6 +7,51 @@
 Kinesis Stream Consumer is a web-based application that allows users to connect to and view messages from Amazon Kinesis streams. 
 It provides a user-friendly interface for inputting AWS credentials, connecting to Kinesis streams, and displaying stream data with filtering and sorting capabilities.
 
+## Running the Application with Docker
+
+The preferred method to run the application is using Docker. This ensures a consistent environment and simplifies the setup process.
+
+### Pulling the Docker Image
+
+To pull the Docker image, run the following command:
+
+```sh
+docker pull ghcr.io/wstolk/kinesis-web-consumer:latest
+```
+
+### Running the Docker Container
+
+To run the Docker container, use the following command:
+
+```sh
+docker run -d -p 3000:3000 --name kinesis-web-consumer ghcr.io/wstolk/kinesis-web-consumer:latest
+```
+
+This will start the application and make it available at `http://localhost:3000`.
+
+### Stopping the Docker Container
+
+To stop the running container, use the following command:
+
+```sh
+docker stop kinesis-web-consumer
+```
+
+### Removing the Docker Container
+
+To remove the container, use the following command:
+
+```sh
+docker rm kinesis-web-consumer
+```
+
+### Additional Docker Commands
+
+- **View logs**: `docker logs kinesis-web-consumer`
+- **Restart the container**: `docker restart kinesis-web-consumer`
+
+Ensure you have Docker installed on your system before running these commands. For more information on Docker, visit the [official Docker documentation](https://docs.docker.com/get-started/).
+
 ## Features
 
 - Connect to AWS Kinesis streams using AWS credentials
