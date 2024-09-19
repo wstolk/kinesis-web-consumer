@@ -87,20 +87,20 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
             <TextField
                 fullWidth
                 margin="normal"
-                label="Session Token (optional)"
-                value={sessionToken}
-                onChange={(e) => setSessionToken(e.target.value)}
-                helperText="Your AWS session token (if applicable)"
-            />
-            <TextField
-                fullWidth
-                margin="normal"
                 required
                 label="Secret Access Key"
                 type="password"
                 value={secretAccessKey}
                 onChange={(e) => setSecretAccessKey(e.target.value)}
                 helperText="Your AWS secret access key"
+            />
+            <TextField
+                fullWidth
+                margin="normal"
+                label="Session Token (optional)"
+                value={sessionToken}
+                onChange={(e) => setSessionToken(e.target.value)}
+                helperText="Your AWS session token (if applicable)"
             />
             <TextField
                 fullWidth
