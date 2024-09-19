@@ -1,5 +1,5 @@
 // pages/api/kinesis.js
-import {createKinesisClient, describeStream, getShardIterator, getRecords} from '../../lib/kinesis';
+import {createKinesisClient, describeStream, getShardIterator, getRecords, getAllShardRecords} from '../../lib/kinesis';
 import {mockFetchKinesisData} from '../../lib/mockKinesisService';
 
 export default async function handler(req, res) {
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
             streamName,
             messageLimit = 20,
             shardIteratorType = 'TRIM_HORIZON',
-            shardId,
+            partitionKey,
             minutesAgo,
             useRealKinesis
         } = req.body;
@@ -27,20 +27,12 @@ export default async function handler(req, res) {
                     streamName,
                     messageLimit,
                     shardIteratorType,
-                    shardId
+                    partitionKey
                 });
             } else {
                 // Use real Kinesis
                 const client = createKinesisClient(accessKeyId, secretAccessKey, region);
-                let shardToUse;
-                if (shardId) {
-                    shardToUse = shardId;
-                } else {
-                    const streamInfo = await describeStream(client, streamName);
-                    shardToUse = streamInfo;
-                }
-                const shardIterator = await getShardIterator(client, streamName, shardToUse, shardIteratorType, minutesAgo);
-                data = await getRecords(client, shardIterator, messageLimit);
+                data = await getAllShardRecords(client, streamName, shardIteratorType, messageLimit, minutesAgo, partitionKey);
             }
 
             res.status(200).json(data);

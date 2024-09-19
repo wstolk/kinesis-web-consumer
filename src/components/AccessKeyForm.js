@@ -26,7 +26,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
     const [messageLimit, setMessageLimit] = useState(20);
     const [minutesAgo, setMinutesAgo] = useState(5);
     const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
-    const [shardId, setShardId] = useState('');
+    const [partitionKey, setPartitionKey] = useState('');
 
     useEffect(() => {
         // Load cached values from localStorage
@@ -38,7 +38,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
             setStreamName(cachedForm.streamName || '');
             setMessageLimit(cachedForm.messageLimit || 20);
             setShardIteratorType(cachedForm.shardIteratorType || 'TRIM_HORIZON');
-            setShardId(cachedForm.shardId || '');
+            setPartitionKey(cachedForm.partitionKey || '');
         }
     }, []);
 
@@ -52,7 +52,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
             messageLimit,
             shardIteratorType,
             minutesAgo,
-            shardId: shardId.trim() || undefined,
+            partitionKey: partitionKey.trim() || undefined,
         };
 
         // Cache form data in localStorage
@@ -157,16 +157,15 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                         value={minutesAgo}
                         onChange={(e) => setMinutesAgo(Math.max(1, parseInt(e.target.value) || 1))}
                         helperText="Number of minutes ago to start fetching (default: 5)"
-                        InputProps={{inputProps: {min: 1}}}
                     />
                 </Collapse>
                 <TextField
                     fullWidth
                     margin="normal"
-                    label="Shard ID (optional)"
-                    value={shardId}
-                    onChange={(e) => setShardId(e.target.value)}
-                    helperText="Specify a shard ID or leave empty to use the first available shard"
+                    label="Partition key (optional)"
+                    value={partitionKey}
+                    onChange={(e) => setPartitionKey(e.target.value)}
+                    helperText="Specify a partition key or leave empty to retrieve all data"
                 />
             </Collapse>
             <Button

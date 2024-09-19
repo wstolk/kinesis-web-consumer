@@ -7,6 +7,7 @@ import MessageModal from '../components/MessageModal';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import {useKinesisMode} from "@/contexts/KinesisModeContext";
+import ErrorNotification from "@/components/ErrorNotification";
 
 const HEADER_HEIGHT = 64;
 const SIDEBAR_WIDTH = 300;
@@ -16,6 +17,7 @@ export default function Home() {
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [sidebarVisible, setSidebarVisible] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
@@ -34,6 +36,11 @@ export default function Home() {
             });
 
             if (!response.ok) {
+                // Set data to empty array
+                setMessages([]);
+                const responseBody = await response.json();
+                setError(responseBody['error']);
+
                 throw new Error('Failed to fetch Kinesis data');
             }
 
@@ -63,6 +70,13 @@ export default function Home() {
 
     const handleToggleSidebar = () => {
         setSidebarVisible(!sidebarVisible);
+    };
+
+    const handleCloseError = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setError(null);
     };
 
     return (
@@ -128,6 +142,8 @@ export default function Home() {
                 open={Boolean(selectedMessage)}
                 onClose={handleCloseModal}
             />
+
+            <ErrorNotification error={error} onClose={handleCloseError} />
         </Box>
     );
 }
