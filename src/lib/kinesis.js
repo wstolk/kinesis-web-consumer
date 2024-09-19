@@ -10,7 +10,18 @@ import {
 const RETRY_DELAY_MS = 2000; // 2 seconds delay for retry
 const MAX_RETRIES = 3; // Maximum number of retries
 
-export const createKinesisClient = (accessKeyId, secretAccessKey, region) => {
+export const createKinesisClient = (accessKeyId, secretAccessKey,sessionToken, region) => {
+    if (sessionToken) {
+        return new KinesisClient({
+            region,
+            credentials: {
+                accessKeyId,
+                secretAccessKey,
+                sessionToken,
+            },
+        });
+    }
+
     return new KinesisClient({
         region,
         credentials: {

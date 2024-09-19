@@ -7,6 +7,7 @@ export default async function handler(req, res) {
         const {
             accessKeyId,
             secretAccessKey,
+            sessionToken,
             region,
             streamName,
             messageLimit = 20,
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
                 });
             } else {
                 // Use real Kinesis
-                const client = createKinesisClient(accessKeyId, secretAccessKey, region);
+                const client = createKinesisClient(accessKeyId, secretAccessKey, sessionToken, region);
                 data = await getAllShardRecords(client, streamName, shardIteratorType, messageLimit, minutesAgo, partitionKey);
             }
 

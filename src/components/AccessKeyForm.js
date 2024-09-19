@@ -20,6 +20,7 @@ const SHARD_ITERATOR_TYPES = [
 const AccessKeyForm = ({onSubmit, isLoading}) => {
     const [accessKeyId, setAccessKeyId] = useState('');
     const [secretAccessKey, setSecretAccessKey] = useState('');
+    const [sessionToken, setSessionToken] = useState('');
     const [region, setRegion] = useState('eu-central-1');
     const [streamName, setStreamName] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -34,6 +35,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
         if (cachedForm) {
             setAccessKeyId(cachedForm.accessKeyId || '');
             setSecretAccessKey(cachedForm.secretAccessKey || '');
+            setSessionToken(cachedForm.sessionToken || '');
             setRegion(cachedForm.region || 'eu-central-1');
             setStreamName(cachedForm.streamName || '');
             setMessageLimit(cachedForm.messageLimit || 20);
@@ -47,6 +49,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
         const formData = {
             accessKeyId,
             secretAccessKey,
+            sessionToken,
             region,
             streamName,
             messageLimit,
@@ -80,6 +83,14 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                 value={accessKeyId}
                 onChange={(e) => setAccessKeyId(e.target.value)}
                 helperText="Your AWS access key ID"
+            />
+            <TextField
+                fullWidth
+                margin="normal"
+                label="Session Token (optional)"
+                value={sessionToken}
+                onChange={(e) => setSessionToken(e.target.value)}
+                helperText="Your AWS session token (if applicable)"
             />
             <TextField
                 fullWidth
