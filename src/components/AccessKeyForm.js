@@ -23,9 +23,10 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
     const [sessionToken, setSessionToken] = useState('');
     const [region, setRegion] = useState('eu-central-1');
     const [streamName, setStreamName] = useState('');
+    const [showAuth, setShowAuth] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [messageLimit, setMessageLimit] = useState(20);
-    const [minutesAgo, setMinutesAgo] = useState(5);
+    const [messageLimit, setMessageLimit] = useState(50);
+    const [minutesAgo, setMinutesAgo] = useState(30);
     const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
     const [partitionKey, setPartitionKey] = useState('');
 
@@ -33,12 +34,8 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
         // Load cached values from localStorage
         const cachedForm = JSON.parse(localStorage.getItem('kinesisFormData'));
         if (cachedForm) {
-            setAccessKeyId(cachedForm.accessKeyId || '');
-            setSecretAccessKey(cachedForm.secretAccessKey || '');
-            setSessionToken(cachedForm.sessionToken || '');
-            setRegion(cachedForm.region || 'eu-central-1');
             setStreamName(cachedForm.streamName || '');
-            setMessageLimit(cachedForm.messageLimit || 20);
+            setMessageLimit(cachedForm.messageLimit || 30);
             setShardIteratorType(cachedForm.shardIteratorType || 'TRIM_HORIZON');
             setPartitionKey(cachedForm.partitionKey || '');
         }
@@ -47,10 +44,6 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         const formData = {
-            accessKeyId,
-            secretAccessKey,
-            sessionToken,
-            region,
             streamName,
             messageLimit,
             shardIteratorType,
@@ -79,49 +72,6 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                 fullWidth
                 margin="normal"
                 required
-                label="Access Key ID"
-                value={accessKeyId}
-                onChange={(e) => setAccessKeyId(e.target.value)}
-                helperText="Your AWS access key ID"
-            />
-            <TextField
-                fullWidth
-                margin="normal"
-                required
-                label="Secret Access Key"
-                type="password"
-                value={secretAccessKey}
-                onChange={(e) => setSecretAccessKey(e.target.value)}
-                helperText="Your AWS secret access key"
-            />
-            <TextField
-                fullWidth
-                margin="normal"
-                label="Session Token (optional)"
-                value={sessionToken}
-                onChange={(e) => setSessionToken(e.target.value)}
-                helperText="Your AWS session token (if applicable)"
-            />
-            <TextField
-                fullWidth
-                margin="normal"
-                required
-                select
-                label="AWS Region"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                helperText="Select the AWS region where your Kinesis stream is located"
-            >
-                {AWS_REGIONS.map((option) => (
-                    <MenuItem key={option} value={option}>
-                        {option}
-                    </MenuItem>
-                ))}
-            </TextField>
-            <TextField
-                fullWidth
-                margin="normal"
-                required
                 label="Kinesis Stream Name"
                 value={streamName}
                 onChange={(e) => setStreamName(e.target.value)}
@@ -138,11 +88,10 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                     fullWidth
                     margin="normal"
                     type="number"
-                    label="Number of Messages to Fetch"
+                    label="Number of Messages to Fetch (optional)"
                     value={messageLimit}
-                    onChange={(e) => setMessageLimit(Math.max(1, parseInt(e.target.value) || 1))}
-                    helperText="Maximum number of messages to retrieve (default: 20)"
-                    InputProps={{inputProps: {min: 1}}}
+                    onChange={(e) => setMessageLimit(parseInt(e.target.value))}
+                    helperText="Maximum number of messages to retrieve (default: 50)"
                 />
                 <TextField
                     fullWidth
@@ -151,7 +100,7 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                     label="Shard Iterator Type"
                     value={shardIteratorType}
                     onChange={(e) => setShardIteratorType(e.target.value)}
-                    helperText="Select the shard iterator type (default: TRIM_HORIZON)"
+                    helperText="Select the shard iterator type (default: AT_TIMESTAMP)"
                 >
                     {SHARD_ITERATOR_TYPES.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -165,9 +114,10 @@ const AccessKeyForm = ({onSubmit, isLoading}) => {
                         margin="normal"
                         type="number"
                         label="Number of minutes ago"
+                        required
                         value={minutesAgo}
-                        onChange={(e) => setMinutesAgo(Math.max(1, parseInt(e.target.value) || 1))}
-                        helperText="Number of minutes ago to start fetching (default: 5)"
+                        onChange={(e) => setMinutesAgo(parseInt(e.target.value))}
+                        helperText="Number of minutes ago to start fetching (default: 30)"
                     />
                 </Collapse>
                 <TextField

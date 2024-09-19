@@ -1,5 +1,5 @@
 // pages/index.js
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Box, AppBar, Toolbar, CircularProgress} from '@mui/material';
 import {useTheme} from '@mui/material/styles';
 import MessageList from '../components/MessageList';
@@ -8,6 +8,7 @@ import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import {useKinesisMode} from "@/contexts/KinesisModeContext";
 import ErrorNotification from "@/components/ErrorNotification";
+import AuthModal from "@/components/AuthModal";
 
 const HEADER_HEIGHT = 64;
 const SIDEBAR_WIDTH = 300;
@@ -18,11 +19,30 @@ export default function Home() {
     const [sidebarVisible, setSidebarVisible] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [credentials, setCredentials] = useState(null);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
-    const handleSubmit = async (credentials) => {
+    useEffect(() => {
+        const savedCredentials = JSON.parse(localStorage.getItem('awsCredentials'));
+        if (savedCredentials) {
+            setCredentials(savedCredentials);
+            setIsAuthenticated(true);
+        } else {
+            setIsAuthModalOpen(true);
+        }
+    }, []);
+
+    const handleSubmit = async (form) => {
+        if (!form) {
+            setError('No form data provided. Please fill in all fields first.');
+            return;
+        }
+
         setIsLoading(true);
+        setError(null);
         try {
             const response = await fetch('/api/kinesis', {
                 method: 'POST',
@@ -31,6 +51,7 @@ export default function Home() {
                 },
                 body: JSON.stringify({
                     ...credentials,
+                    ...form,
                     useRealKinesis
                 }),
             });
@@ -47,7 +68,7 @@ export default function Home() {
             const data = await response.json();
             setMessages(data.records.map(record => ({
                 ...record,
-                timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }),
+                timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', {timeZone: 'Europe/Amsterdam'}),
                 partitionKey: record.PartitionKey,
                 data: record.Data,
                 ShardId: record.ShardId || 'N/A'
@@ -79,14 +100,32 @@ export default function Home() {
         setError(null);
     };
 
+    const handleOpenAuthModal = () => {
+        setIsAuthModalOpen(true);
+    };
+
+    const handleCloseAuthModal = () => {
+        setIsAuthModalOpen(false);
+    };
+
+    const handleAuthSubmit = (newCredentials) => {
+        setCredentials(newCredentials);
+        setIsAuthenticated(true);
+        setIsAuthModalOpen(false);
+    };
+
     return (
         <Box sx={{display: 'flex', flexDirection: 'column', height: '100vh'}}>
             <AppBar position="fixed" sx={{zIndex: theme.zIndex.drawer + 1}}>
                 <Toolbar>
-                    <Header onToggleSidebar={handleToggleSidebar}/>
+                    <Header
+                        onOpenAuthModal={handleOpenAuthModal}
+                        isAuthenticated={isAuthenticated}
+                        onToggleSidebar={handleToggleSidebar}/>
                 </Toolbar>
             </AppBar>
-            <Box sx={{display: 'flex', pt: `${HEADER_HEIGHT}px`, height: `calc(100vh - ${HEADER_HEIGHT}px)`}}>
+            {/*<Box sx={{display: 'flex', pt: `${HEADER_HEIGHT}px`, height: `calc(100vh - ${HEADER_HEIGHT}px)`}}>*/}
+            <Box sx={{display: 'flex', pt: `${HEADER_HEIGHT}px`, height: '100%'}}>
                 <Sidebar
                     isVisible={sidebarVisible}
                     onSubmit={handleSubmit}
@@ -127,7 +166,6 @@ export default function Home() {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                backgroundColor: 'rgba(255, 255, 255, 0.7)',
                             }}>
                                 <CircularProgress/>
                             </Box>
@@ -137,13 +175,20 @@ export default function Home() {
                     </Box>
                 </Box>
             </Box>
+
             <MessageModal
                 message={selectedMessage}
                 open={Boolean(selectedMessage)}
                 onClose={handleCloseModal}
             />
 
-            <ErrorNotification error={error} onClose={handleCloseError} />
+            <ErrorNotification error={error} onClose={handleCloseError}/>
+
+            <AuthModal
+                open={isAuthModalOpen}
+                onClose={handleCloseAuthModal}
+                onSubmit={handleAuthSubmit}
+            />
         </Box>
     );
 }
