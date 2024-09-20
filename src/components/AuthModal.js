@@ -49,12 +49,14 @@ const AuthModal = ({ open, onClose, onSubmit }) => {
 
             const data = await response.json();
 
+            // If the response is OK, save the credentials and close the modal
             if (response.ok) {
                 const credentials = { accessKeyId, secretAccessKey, sessionToken, region };
                 localStorage.setItem('awsCredentials', JSON.stringify(credentials));
                 onSubmit(credentials, data);
                 onClose();
             } else {
+                // TODO: implement handling of 403: user is authenticated but does not have permission to list streams
                 console.error(data.message);
             }
         } catch (error) {

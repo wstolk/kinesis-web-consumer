@@ -1,6 +1,6 @@
 // pages/api/kinesis.js
-import {createKinesisClient, describeStream, getShardIterator, getRecords, getAllShardRecords} from '../../lib/kinesis';
-import {mockFetchKinesisData} from '../../lib/mockKinesisService';
+import {createKinesisClient, getAllShardRecords} from '@/lib/kinesis';
+import {mockFetchKinesisData} from '@/lib/mockKinesisService';
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
             res.status(500).json({error: error.message});
         }
     } else {
+        // Only allow POST requests
         res.setHeader('Allow', ['POST']);
         res.status(405).end(`Method ${req.method} Not Allowed`);
     }

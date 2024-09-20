@@ -62,11 +62,10 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
                 AWS Kinesis Configuration
             </Typography>
             <Typography variant="body2">
-                Please provide your AWS credentials and Kinesis stream details below.
+                Please provide your Kinesis stream details below.
                 This information is required to connect to your AWS Kinesis stream and retrieve messages.
-                Ensure that your AWS credentials have the necessary permissions to access the specified Kinesis
-                stream.
             </Typography>
+            {/* Display a dropdown if stream list is available, otherwise show a text field */}
             {streams.length > 0 ? (
                 <TextField
                     fullWidth

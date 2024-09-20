@@ -4,8 +4,8 @@ import Head from 'next/head';
 import {ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import {CacheProvider} from '@emotion/react';
-import createEmotionCache from '../lib/createEmotionCache';
-import theme from '../lib/theme';
+import createEmotionCache from '@/lib/createEmotionCache';
+import theme from '@/lib/theme';
 import {KinesisModeProvider} from "@/contexts/KinesisModeContext";
 
 import '@fontsource/roboto/300.css';
@@ -28,6 +28,8 @@ export default function MyApp(props) {
             <ThemeProvider theme={theme}>
                 {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
                 <CssBaseline/>
+
+                {/* KinesisModeProvider wraps the entire app to provide the KinesisModeContext */}
                 <KinesisModeProvider>
                     <Component {...pageProps} />
                 </KinesisModeProvider>

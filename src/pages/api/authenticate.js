@@ -3,7 +3,7 @@ import {KinesisClient, ListStreamsCommand} from "@aws-sdk/client-kinesis";
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
-        const {accessKeyId, secretAccessKey, region} = req.body;
+        const {accessKeyId, secretAccessKey, sessionToken, region} = req.body;
 
         try {
             const client = new KinesisClient({
@@ -11,6 +11,7 @@ export default async function handler(req, res) {
                 credentials: {
                     accessKeyId,
                     secretAccessKey,
+                    sessionToken
                 },
             });
 
@@ -27,8 +28,10 @@ export default async function handler(req, res) {
             console.error('Authentication error:', error);
 
             if (error.name === 'InvalidClientTokenId' || error.name === 'SignatureDoesNotMatch') {
+                // Invalid credentials
                 res.status(401).json({authenticated: false, message: 'Invalid credentials'});
             } else if (error.name === 'AccessDeniedException') {
+                // Authentication successful, but user does not have permission to list streams
                 res.status(403).json({
                     authenticated: true,
                     canListStreams: false,
