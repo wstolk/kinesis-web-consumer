@@ -1,5 +1,5 @@
 // components/AuthModal.js
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
     Modal,
     Box,
@@ -18,7 +18,7 @@ const AWS_REGIONS = [
     "sa-east-1"
 ];
 
-const AuthModal = ({ open, onClose, onSubmit }) => {
+const AuthModal = ({open, onClose, onSubmit, onError}) => {
     const [accessKeyId, setAccessKeyId] = useState('');
     const [secretAccessKey, setSecretAccessKey] = useState('');
     const [sessionToken, setSessionToken] = useState('');
@@ -44,20 +44,25 @@ const AuthModal = ({ open, onClose, onSubmit }) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ accessKeyId, secretAccessKey, sessionToken, region }),
+                body: JSON.stringify({accessKeyId, secretAccessKey, sessionToken, region}),
             });
 
             const data = await response.json();
+            const credentials = {accessKeyId, secretAccessKey, sessionToken, region};
 
             // If the response is OK, save the credentials and close the modal
             if (response.ok) {
-                const credentials = { accessKeyId, secretAccessKey, sessionToken, region };
                 localStorage.setItem('awsCredentials', JSON.stringify(credentials));
                 onSubmit(credentials, data);
                 onClose();
             } else {
-                // TODO: implement handling of 403: user is authenticated but does not have permission to list streams
-                console.error(data.message);
+                onError(data.message);
+
+                if (response.status === 403) {
+                    localStorage.setItem('awsCredentials', JSON.stringify(credentials));
+                    onSubmit(credentials, null);
+                    onClose();
+                }
             }
         } catch (error) {
             console.error(error);
@@ -124,7 +129,7 @@ const AuthModal = ({ open, onClose, onSubmit }) => {
                         type="submit"
                         variant="contained"
                         fullWidth
-                        sx={{ mt: 2 }}
+                        sx={{mt: 2}}
                     >
                         Authenticate
                     </Button>

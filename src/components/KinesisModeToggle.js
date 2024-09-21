@@ -1,7 +1,7 @@
 // components/KinesisModeToggle.js
 import React from 'react';
 import {Switch, FormControlLabel} from '@mui/material';
-import {useKinesisMode} from '../contexts/KinesisModeContext';
+import {useKinesisMode} from '@/contexts/KinesisModeContext';
 
 const KinesisModeToggle = () => {
     const {useRealKinesis, setUseRealKinesis} = useKinesisMode();

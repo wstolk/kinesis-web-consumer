@@ -216,6 +216,7 @@ export default function Home() {
                 open={isAuthModalOpen}
                 onClose={handleCloseAuthModal}
                 onSubmit={handleAuthSubmit}
+                onError={setError}
             />
         </Box>
     );
