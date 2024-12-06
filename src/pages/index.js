@@ -9,6 +9,7 @@ import Sidebar from '@/components/Sidebar';
 import {useKinesisMode} from '@/contexts/KinesisModeContext';
 import ErrorNotification from '@/components/ErrorNotification';
 import AuthModal from '@/components/AuthModal';
+import LogViewer from "@/components/LogViewer";
 
 const HEADER_HEIGHT = 64;
 const SIDEBAR_WIDTH = 300;
@@ -198,6 +199,8 @@ export default function Home() {
                             <MessageList messages={messages} onMessageClick={handleMessageClick}/>
                         )}
                     </Box>
+
+                    <LogViewer sidebarWidth={sidebarVisible ? SIDEBAR_WIDTH : 0} />
                 </Box>
             </Box>
 

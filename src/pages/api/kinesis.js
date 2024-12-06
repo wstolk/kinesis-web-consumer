@@ -1,6 +1,7 @@
 // pages/api/kinesis.js
 import {createKinesisClient, getAllShardRecords} from '@/lib/kinesis';
 import {mockFetchKinesisData} from '@/lib/mockKinesisService';
+import {loggingService} from "@/lib/loggingService";
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
@@ -16,6 +17,11 @@ export default async function handler(req, res) {
             minutesAgo,
             useRealKinesis
         } = req.body;
+
+        const redactedRequestBody = {...req.body, accessKeyId: 'REDACTED', secretAccessKey: 'REDACTED'};
+        console.log('Request body:', redactedRequestBody);
+        loggingService.log('info', `Fetching Kinesis data for stream ${streamName}`);
+        loggingService.log('info', `Request body: ${JSON.stringify(redactedRequestBody)}`);
 
         try {
             let data;
@@ -39,6 +45,7 @@ export default async function handler(req, res) {
             res.status(200).json(data);
         } catch (error) {
             console.error('Error:', error);
+            loggingService.log('error', `Failed to fetch Kinesis data: ${error.message}`);
             res.status(500).json({error: error.message});
         }
     } else {

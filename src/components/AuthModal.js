@@ -57,12 +57,6 @@ const AuthModal = ({open, onClose, onSubmit, onError}) => {
                 onClose();
             } else {
                 onError(data.message);
-
-                if (response.status === 403) {
-                    localStorage.setItem('awsCredentials', JSON.stringify(credentials));
-                    onSubmit(credentials, null);
-                    onClose();
-                }
             }
         } catch (error) {
             console.error(error);

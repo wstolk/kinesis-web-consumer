@@ -6,6 +6,12 @@ import {CopyBlock, dracula} from "react-code-blocks";
 const MessageModal = ({message, open, onClose}) => {
     if (!message) return null;
 
+    try {
+        message.data = JSON.parse(message.data);
+    } catch (e) {
+        console.log("Error parsing message data", e);
+    }
+
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle>Message Details</DialogTitle>
