@@ -37,6 +37,7 @@ services:
       "
     environment:
       - AWS_DEFAULT_REGION=eu-central-1
+      - AWS_ENDPOINT_URL=http://localstack:4566
       - EDGE_PORT=4566
     depends_on:
       localstack:
