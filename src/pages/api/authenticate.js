@@ -3,19 +3,28 @@ import {KinesisClient, ListStreamsCommand} from "@aws-sdk/client-kinesis";
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
-        const {accessKeyId, secretAccessKey, sessionToken, region} = req.body;
+        const {accessKeyId, secretAccessKey, sessionToken, region, endpoint} = req.body;
 
         try {
-            const client = new KinesisClient({
+            const clientConfig = {
                 region,
                 credentials: {
                     accessKeyId,
                     secretAccessKey,
-                    sessionToken
+                    sessionToken: sessionToken || undefined,
                 },
-            });
+            };
 
-            // Attempt to list streams to verify credentials and permissions
+            // Add custom endpoint if provided
+            if (endpoint) {
+                clientConfig.endpoint = endpoint;
+                // For LocalStack, we typically want to disable SSL
+                if (endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) {
+                    clientConfig.tls = false;
+                }
+            }
+
+            const client = new KinesisClient(clientConfig);
             const command = new ListStreamsCommand({});
             const response = await client.send(command);
 
@@ -28,17 +37,18 @@ export default async function handler(req, res) {
             console.error('Authentication error:', error);
 
             if (error.name === 'InvalidClientTokenId' || error.name === 'SignatureDoesNotMatch') {
-                // Invalid credentials
                 res.status(401).json({authenticated: false, message: 'Invalid credentials'});
             } else if (error.name === 'AccessDeniedException') {
-                // Authentication successful, but user does not have permission to list streams
                 res.status(403).json({
                     authenticated: true,
                     canListStreams: false,
                     message: 'Authentication successful, but insufficient permissions to list streams'
                 });
             } else {
-                res.status(500).json({authenticated: false, message: 'An unexpected error occurred'});
+                res.status(500).json({
+                    authenticated: false,
+                    message: `An unexpected error occurred: ${error.message}`
+                });
             }
         }
     } else {

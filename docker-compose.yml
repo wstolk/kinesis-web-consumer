@@ -1,0 +1,43 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=kinesis
+      - DEFAULT_REGION=eu-central-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4566/_localstack/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  aws-cli:
+    image: localstack/localstack:latest
+    entrypoint: [ ]
+    command: >
+      sh -c "
+        echo 'Waiting for LocalStack to be ready...' &&
+        while ! curl -s http://localstack:4566/_localstack/health | grep -q '\"kinesis\": \"running\"'; do
+          sleep 1;
+        done &&
+        echo 'Creating Kinesis stream...' &&
+        awslocal kinesis create-stream --stream-name my-stream --shard-count 1 &&
+        echo 'Waiting for stream to become active...' &&
+        while [[ $$(awslocal kinesis describe-stream --stream-name my-stream --query 'StreamDescription.StreamStatus' --output text) != 'ACTIVE' ]]; do
+          sleep 1;
+        done &&
+        echo 'Kinesis stream created successfully!' &&
+        awslocal kinesis list-streams
+      "
+    environment:
+      - AWS_DEFAULT_REGION=eu-central-1
+      - EDGE_PORT=4566
+    depends_on:
+      localstack:
+        condition: service_healthy

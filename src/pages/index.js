@@ -1,4 +1,3 @@
-// pages/index.js
 import React, {useState, useEffect} from 'react';
 import {Box, AppBar, Toolbar, CircularProgress} from '@mui/material';
 import {useTheme} from '@mui/material/styles';
@@ -23,15 +22,23 @@ export default function Home() {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [credentials, setCredentials] = useState(null);
+    const [activeProfile, setActiveProfile] = useState(null);
+    const [profiles, setProfiles] = useState([]);
     const [streams, setStreams] = useState([]);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
-    // Load saved credentials and stream names from localStorage
+    // Load saved credentials, active profile, and stream names from localStorage
     useEffect(() => {
         const savedCredentials = JSON.parse(localStorage.getItem('awsCredentials'));
-        if (savedCredentials) {
+        const lastUsedProfile = localStorage.getItem('lastUsedProfile');
+        const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
+
+        setProfiles(savedProfiles);
+
+        if (savedCredentials && lastUsedProfile) {
             setCredentials(savedCredentials);
+            setActiveProfile(lastUsedProfile);
             setIsAuthenticated(true);
 
             // Stream names are retrieved on authentication check in the backend and cached in localStorage
@@ -72,7 +79,6 @@ export default function Home() {
                 setMessages([]);
                 const responseBody = await response.json();
                 setError(responseBody['error']);
-
                 throw new Error('Failed to fetch Kinesis data');
             }
 
@@ -86,7 +92,6 @@ export default function Home() {
             })));
         } catch (error) {
             console.error('Error:', error);
-            // Handle error (e.g., show an error message to the user)
         } finally {
             setIsLoading(false);
         }
@@ -122,14 +127,53 @@ export default function Home() {
     // Handle authentication form submit and store resulting streams in localStorage
     const handleAuthSubmit = (newCredentials, authResponse) => {
         setCredentials(newCredentials);
+        setActiveProfile(newCredentials.name);
         setIsAuthenticated(true);
         setIsAuthModalOpen(false);
 
+        // Update profiles in state and localStorage
+        const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
+        setProfiles(savedProfiles);
+
+        localStorage.setItem('awsCredentials', JSON.stringify(newCredentials));
+        localStorage.setItem('lastUsedProfile', newCredentials.name);
+
         if (authResponse.streams) {
             setStreams(authResponse.streams);
-
-            // Cache streams in localStorage
             localStorage.setItem('awsStreams', JSON.stringify(authResponse.streams));
+        }
+    };
+
+    // Handle profile selection
+    const handleProfileSelect = async (profile) => {
+        try {
+            const response = await fetch('/api/authenticate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(profile),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setCredentials(profile);
+                setActiveProfile(profile.name);
+                setIsAuthenticated(true);
+                localStorage.setItem('awsCredentials', JSON.stringify(profile));
+                localStorage.setItem('lastUsedProfile', profile.name);
+
+                if (data.streams) {
+                    setStreams(data.streams);
+                    localStorage.setItem('awsStreams', JSON.stringify(data.streams));
+                }
+            } else {
+                setError(data.message || 'Failed to authenticate with selected profile');
+            }
+        } catch (error) {
+            console.error('Error selecting profile:', error);
+            setError('Failed to authenticate with selected profile');
         }
     };
 
@@ -141,7 +185,11 @@ export default function Home() {
                     <Header
                         onOpenAuthModal={handleOpenAuthModal}
                         isAuthenticated={isAuthenticated}
-                        onToggleSidebar={handleToggleSidebar}/>
+                        onToggleSidebar={handleToggleSidebar}
+                        profiles={profiles}
+                        activeProfileName={activeProfile}
+                        onProfileSelect={handleProfileSelect}
+                    />
                 </Toolbar>
             </AppBar>
 
@@ -200,11 +248,11 @@ export default function Home() {
                         )}
                     </Box>
 
-                    <LogViewer sidebarWidth={sidebarVisible ? SIDEBAR_WIDTH : 0} />
+                    <LogViewer sidebarWidth={sidebarVisible ? SIDEBAR_WIDTH : 0}/>
                 </Box>
             </Box>
 
-            {/* Modal for showing message content */}
+            {/* Message Modal */}
             <MessageModal
                 message={selectedMessage}
                 open={Boolean(selectedMessage)}
@@ -220,6 +268,8 @@ export default function Home() {
                 onClose={handleCloseAuthModal}
                 onSubmit={handleAuthSubmit}
                 onError={setError}
+                activeProfileName={activeProfile}
+                onProfileSelect={handleProfileSelect}
             />
         </Box>
     );
