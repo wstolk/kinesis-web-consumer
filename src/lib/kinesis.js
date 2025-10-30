@@ -7,6 +7,7 @@ import {
     ProvisionedThroughputExceededException,
     ExpiredIteratorException
 } from "@aws-sdk/client-kinesis";
+import { fromIni } from '@aws-sdk/credential-providers';
 import {loggingService} from './loggingService';
 
 const RETRY_DELAY_MS = 2000;
@@ -14,19 +15,43 @@ const MAX_RETRIES = 3;
 const EMPTY_RESPONSE_RETRY_DELAY = 1000;
 const MAX_EMPTY_RETRIES = 3;
 
-export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, region) => {
-    if (!sessionToken || sessionToken === '') {
-        sessionToken = null;
-    }
-    loggingService.log('info', `Creating Kinesis client for region ${region}`);
-    return new KinesisClient({
-        region,
-        credentials: {
+/**
+ * Creates a Kinesis client with the specified authentication method
+ * @param {string} accessKeyId - AWS access key ID (for manual credentials)
+ * @param {string} secretAccessKey - AWS secret access key (for manual credentials)
+ * @param {string} sessionToken - AWS session token (optional, for manual credentials)
+ * @param {string} region - AWS region
+ * @param {boolean} useDefaultCredentials - Whether to use AWS default credential chain
+ * @param {string} awsProfile - AWS profile name (when using profiles)
+ * @returns {KinesisClient} Configured Kinesis client
+ */
+export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials = false, awsProfile = null) => {
+    const clientConfig = { region };
+    
+    if (useDefaultCredentials) {
+        if (awsProfile && awsProfile !== 'default') {
+            // Use specific AWS profile
+            clientConfig.credentials = fromIni({ profile: awsProfile });
+            loggingService.log('info', `Creating Kinesis client for region ${region} using AWS profile: ${awsProfile}`);
+        } else {
+            // Use AWS SDK default credential chain
+            // This will check: environment variables, IAM roles, ~/.aws/credentials, etc.
+            loggingService.log('info', `Creating Kinesis client for region ${region} using default credential chain`);
+        }
+    } else {
+        // Use manually provided credentials
+        if (!sessionToken || sessionToken === '') {
+            sessionToken = null;
+        }
+        clientConfig.credentials = {
             accessKeyId,
             secretAccessKey,
             sessionToken
-        },
-    });
+        };
+        loggingService.log('info', `Creating Kinesis client for region ${region} using manual credentials`);
+    }
+    
+    return new KinesisClient(clientConfig);
 };
 
 const retryableOperation = async (operation, retries = 0) => {
@@ -128,6 +153,16 @@ export const describeStream = async (client, streamName) => {
     });
 };
 
+/**
+ * Fetches records from all shards of a Kinesis stream
+ * @param {KinesisClient} client - Configured Kinesis client
+ * @param {string} streamName - Name of the Kinesis stream
+ * @param {string} shardIteratorType - Type of shard iterator (TRIM_HORIZON, LATEST, etc.)
+ * @param {number} messageLimit - Maximum number of messages to fetch
+ * @param {number} minutesAgo - Minutes ago for AT_TIMESTAMP iterator type
+ * @param {string} partitionKey - Optional partition key filter
+ * @returns {Promise<Object>} Object containing records and metadata
+ */
 export const getAllShardRecords = async (client, streamName, shardIteratorType, messageLimit, minutesAgo, partitionKey) => {
     const streamDescription = await describeStream(client, streamName);
     const shards = streamDescription.Shards;

@@ -15,13 +15,14 @@ export default async function handler(req, res) {
             shardIteratorType = 'TRIM_HORIZON',
             partitionKey,
             minutesAgo,
-            useRealKinesis
+            useRealKinesis,
+            useDefaultCredentials,
+            awsProfile
         } = req.body;
 
         const redactedRequestBody = {...req.body, accessKeyId: 'REDACTED', secretAccessKey: 'REDACTED'};
-        console.log('Request body:', redactedRequestBody);
         loggingService.log('info', `Fetching Kinesis data for stream ${streamName}`);
-        loggingService.log('info', `Request body: ${JSON.stringify(redactedRequestBody)}`);
+        loggingService.log('debug', `Request body: ${JSON.stringify(redactedRequestBody)}`);
 
         try {
             let data;
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
                 });
             } else {
                 // Use real Kinesis
-                const client = createKinesisClient(accessKeyId, secretAccessKey, sessionToken, region);
+                const client = createKinesisClient(accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials, awsProfile);
                 data = await getAllShardRecords(client, streamName, shardIteratorType, messageLimit, minutesAgo, partitionKey);
             }
 

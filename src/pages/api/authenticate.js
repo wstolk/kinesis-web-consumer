@@ -1,19 +1,33 @@
 // pages/api/authenticate.js
 import {KinesisClient, ListStreamsCommand} from "@aws-sdk/client-kinesis";
+import { fromIni } from '@aws-sdk/credential-providers';
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
-        const {accessKeyId, secretAccessKey, sessionToken, region, endpoint} = req.body;
+        const {accessKeyId, secretAccessKey, sessionToken, region, endpoint, useDefaultCredentials, awsProfile} = req.body;
 
         try {
             const clientConfig = {
                 region,
-                credentials: {
+            };
+
+            // Use default credential chain or manual credentials
+            if (useDefaultCredentials) {
+                if (awsProfile && awsProfile !== 'default') {
+                    // Use specific AWS profile
+                    clientConfig.credentials = fromIni({ profile: awsProfile });
+                } else {
+                    // Use default profile or credential chain
+                    // Don't set credentials property - SDK will handle credential resolution
+                }
+            } else {
+                // Use manually provided credentials
+                clientConfig.credentials = {
                     accessKeyId,
                     secretAccessKey,
                     sessionToken: sessionToken || undefined,
-                },
-            };
+                };
+            }
 
             // Add custom endpoint if provided
             if (endpoint) {

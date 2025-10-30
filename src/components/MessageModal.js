@@ -6,10 +6,16 @@ import {CopyBlock, dracula} from "react-code-blocks";
 const MessageModal = ({message, open, onClose}) => {
     if (!message) return null;
 
+    // Ensure message data is properly formatted for display
+    let displayData = message.data;
     try {
-        message.data = JSON.parse(message.data);
+        // If data is a string, try to parse it as JSON
+        if (typeof message.data === 'string') {
+            displayData = JSON.parse(message.data);
+        }
     } catch (e) {
-        console.log("Error parsing message data", e);
+        // Keep original data if JSON parsing fails
+        displayData = message.data;
     }
 
     return (
@@ -30,7 +36,7 @@ const MessageModal = ({message, open, onClose}) => {
                 <Box sx={{flexGrow: 1, overflow: 'auto'}}>
                     <CopyBlock
                         language={"js"}
-                        text={JSON.stringify(message.data, null, 2)}
+                        text={JSON.stringify(displayData, null, 2)}
                         theme={dracula}
                         wrapLines
                     />

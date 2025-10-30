@@ -1,6 +1,11 @@
 // lib/mockKinesisService.js
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Generates mock Kinesis message data for testing
+ * @param {string} shardId - The shard ID to associate with the message
+ * @returns {Object} Mock Kinesis record
+ */
 const generateMockMessage = (shardId) => {
     const eventTypes = ['click', 'view', 'purchase', 'signup'];
     const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
@@ -29,6 +34,18 @@ const mockShards = [
     { ShardId: 'shardId-000000000002' },
 ];
 
+/**
+ * Simulates fetching Kinesis data for development and testing
+ * @param {Object} params - Parameters for mock data generation
+ * @param {string} params.accessKeyId - Mock access key ID
+ * @param {string} params.secretAccessKey - Mock secret access key
+ * @param {string} params.region - AWS region
+ * @param {string} params.streamName - Stream name
+ * @param {number} params.messageLimit - Maximum number of messages to generate
+ * @param {string} params.shardIteratorType - Iterator type for simulation
+ * @param {string} params.shardId - Optional specific shard ID
+ * @returns {Promise<Object>} Mock Kinesis response
+ */
 export const mockFetchKinesisData = async ({
                                                accessKeyId,
                                                secretAccessKey,
@@ -38,16 +55,6 @@ export const mockFetchKinesisData = async ({
                                                shardIteratorType = 'TRIM_HORIZON',
                                                shardId
                                            }) => {
-    console.log('Mock fetching Kinesis data with settings:', {
-        accessKeyId,
-        secretAccessKey,
-        region,
-        streamName,
-        messageLimit,
-        shardIteratorType,
-        shardId
-    });
-
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 

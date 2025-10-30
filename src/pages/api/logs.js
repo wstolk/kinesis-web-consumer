@@ -3,8 +3,6 @@ import {loggingService} from '../../lib/loggingService';
 
 export default function handler(req, res) {
     if (req.method === 'GET') {
-        console.log('Logs endpoint called');
-
         // Set headers for SSE
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache, no-transform');

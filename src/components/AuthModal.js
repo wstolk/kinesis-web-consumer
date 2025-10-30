@@ -12,13 +12,18 @@ import {
     ListItemSecondaryAction,
     IconButton,
     Divider,
-    useTheme
+    useTheme,
+    FormControlLabel,
+    Switch,
+    Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloudIcon from '@mui/icons-material/Cloud';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 
 const AWS_REGIONS = [
     "us-east-1", "us-east-2", "us-west-1", "us-west-2",
@@ -36,6 +41,8 @@ const DEFAULT_PROFILE = {
     sessionToken: '',
     region: 'eu-central-1',
     endpoint: '',
+    useDefaultCredentials: true, // Default to credential chain
+    awsProfile: 'default', // Default AWS profile
 };
 
 const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfileSelect}) => {
@@ -43,18 +50,46 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
     const [profiles, setProfiles] = useState([]);
     const [editingProfile, setEditingProfile] = useState(null);
     const [formData, setFormData] = useState(DEFAULT_PROFILE);
+    const [awsProfiles, setAwsProfiles] = useState([]);
+    const [loadingAwsProfiles, setLoadingAwsProfiles] = useState(false);
 
     useEffect(() => {
         // Load profiles from localStorage
         const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
         setProfiles(savedProfiles);
 
-        // Always start in "new profile" mode when opened
+        // Load AWS profiles from filesystem when modal opens
         if (open) {
             setEditingProfile(null);
             setFormData(DEFAULT_PROFILE);
+            loadAwsProfiles();
         }
     }, [open]);
+
+    const loadAwsProfiles = async () => {
+        setLoadingAwsProfiles(true);
+        try {
+            const response = await fetch('/api/aws-profiles');
+            const data = await response.json();
+            
+            if (response.ok) {
+                setAwsProfiles(data.profiles || []);
+                // Auto-select region from default profile if available
+                const defaultProfile = data.profiles?.find(p => p.profileName === 'default');
+                if (defaultProfile && defaultProfile.region) {
+                    setFormData(prev => ({ ...prev, region: defaultProfile.region }));
+                }
+            } else {
+                console.warn('Failed to load AWS profiles:', data.message);
+                setAwsProfiles([]);
+            }
+        } catch (error) {
+            console.error('Error loading AWS profiles:', error);
+            setAwsProfiles([]);
+        } finally {
+            setLoadingAwsProfiles(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -192,9 +227,22 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                                     sx={{fontSize: 16}}
                                                 />
                                             )}
+                                            {profile.useDefaultCredentials && (
+                                                <Chip
+                                                    icon={<CloudIcon />}
+                                                    label="Default"
+                                                    size="small"
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            )}
                                         </Box>
                                     }
-                                    secondary={profile.endpoint ? 'Custom endpoint' : profile.region}
+                                    secondary={
+                                        profile.useDefaultCredentials 
+                                            ? `AWS Profile: ${profile.awsProfile || 'default'} (${profile.region})`
+                                            : (profile.endpoint ? 'Custom endpoint' : profile.region)
+                                    }
                                 />
                                 <ListItemSecondaryAction>
                                     <IconButton
@@ -266,31 +314,100 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 required
                             />
-                            <TextField
-                                fullWidth
-                                margin="normal"
-                                label="Access Key ID"
-                                value={formData.accessKeyId}
-                                onChange={(e) => setFormData({...formData, accessKeyId: e.target.value})}
-                                required
-                            />
-                            <TextField
-                                fullWidth
-                                margin="normal"
-                                label="Secret Access Key"
-                                type="password"
-                                value={formData.secretAccessKey}
-                                onChange={(e) => setFormData({...formData, secretAccessKey: e.target.value})}
-                                required
-                            />
-                            <TextField
-                                fullWidth
-                                margin="normal"
-                                label="Session Token (optional)"
-                                value={formData.sessionToken}
-                                onChange={(e) => setFormData({...formData, sessionToken: e.target.value})}
-                                helperText="Your AWS session token (if applicable)"
-                            />
+                            
+                            <Box sx={{ mt: 2, mb: 2 }}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={formData.useDefaultCredentials}
+                                            onChange={(e) => setFormData({
+                                                ...formData, 
+                                                useDefaultCredentials: e.target.checked,
+                                                // Clear manual credentials when switching to default
+                                                ...(e.target.checked && {
+                                                    accessKeyId: '',
+                                                    secretAccessKey: '',
+                                                    sessionToken: '',
+                                                })
+                                            })}
+                                        />
+                                    }
+                                    label={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            {formData.useDefaultCredentials ? <CloudIcon /> : <VpnKeyIcon />}
+                                            {formData.useDefaultCredentials ? 'Use AWS Profile (Recommended)' : 'Use Manual Credentials'}
+                                        </Box>
+                                    }
+                                />
+                                <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mt: 0.5 }}>
+                                    {formData.useDefaultCredentials 
+                                        ? 'Use AWS profiles from ~/.aws/credentials and ~/.aws/config'
+                                        : 'Manually specify AWS access keys and secrets'
+                                    }
+                                </Typography>
+                            </Box>
+
+                            {formData.useDefaultCredentials && (
+                                <TextField
+                                    fullWidth
+                                    margin="normal"
+                                    select
+                                    label="AWS Profile"
+                                    value={formData.awsProfile}
+                                    onChange={(e) => {
+                                        const selectedProfile = awsProfiles.find(p => p.profileName === e.target.value);
+                                        setFormData({
+                                            ...formData, 
+                                            awsProfile: e.target.value,
+                                            // Auto-update region from profile if available
+                                            ...(selectedProfile?.region && { region: selectedProfile.region })
+                                        });
+                                    }}
+                                    disabled={loadingAwsProfiles}
+                                    helperText={loadingAwsProfiles ? "Loading AWS profiles..." : `${awsProfiles.length} profiles found in ~/.aws/`}
+                                >
+                                    {awsProfiles.map((profile) => (
+                                        <MenuItem key={profile.profileName} value={profile.profileName}>
+                                            {profile.profileName} {profile.region && `(${profile.region})`}
+                                        </MenuItem>
+                                    ))}
+                                    {awsProfiles.length === 0 && (
+                                        <MenuItem value="default">
+                                            default (fallback)
+                                        </MenuItem>
+                                    )}
+                                </TextField>
+                            )}
+
+                            {!formData.useDefaultCredentials && (
+                                <>
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Access Key ID"
+                                        value={formData.accessKeyId}
+                                        onChange={(e) => setFormData({...formData, accessKeyId: e.target.value})}
+                                        required
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Secret Access Key"
+                                        type="password"
+                                        value={formData.secretAccessKey}
+                                        onChange={(e) => setFormData({...formData, secretAccessKey: e.target.value})}
+                                        required
+                                    />
+                                    <TextField
+                                        fullWidth
+                                        margin="normal"
+                                        label="Session Token (optional)"
+                                        value={formData.sessionToken}
+                                        onChange={(e) => setFormData({...formData, sessionToken: e.target.value})}
+                                        helperText="Your AWS session token (if applicable)"
+                                    />
+                                </>
+                            )}
                             <TextField
                                 fullWidth
                                 margin="normal"
