@@ -28,6 +28,23 @@ export const DEFAULT_MESSAGE_LIMIT = 50;
 export const DEFAULT_MINUTES_AGO = 30;
 export const DEFAULT_REGION = 'eu-central-1';
 
+// Polling Configuration
+export const POLLING_INTERVALS = [
+    { label: '5 seconds', value: 5000 },
+    { label: '10 seconds', value: 10000 },
+    { label: '30 seconds', value: 30000 },
+    { label: '1 minute', value: 60000 },
+    { label: '5 minutes', value: 300000 }
+];
+
+export const DEFAULT_POLLING_INTERVAL = 30000; // 30 seconds
+export const MIN_POLLING_INTERVAL = 5000; // 5 seconds
+export const MAX_POLLING_INTERVAL = 300000; // 5 minutes
+
+// Production Limits
+export const MAX_MESSAGES_LIMIT = 1000; // Cap for memory management
+export const MAX_STORED_MESSAGES = 5000; // Max messages to keep in memory
+
 // LocalStorage Keys
 export const STORAGE_KEYS = {
     AWS_CREDENTIALS: 'awsCredentials',

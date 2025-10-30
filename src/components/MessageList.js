@@ -6,18 +6,40 @@ import {
     ButtonGroup,
     Button,
     useTheme,
-    InputBase
+    InputBase,
+    IconButton,
+    Chip,
+    Menu,
+    MenuItem,
+    Tooltip,
+    Divider
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { POLLING_INTERVALS } from '@/lib/constants';
 
-const MessageList = ({messages, onMessageClick}) => {
+const MessageList = ({
+    messages, 
+    onMessageClick,
+    isPolling,
+    onTogglePolling,
+    pollInterval,
+    onUpdatePollingInterval,
+    pollStats,
+    isAuthenticated
+}) => {
     const [partitionKeyFilter, setPartitionKeyFilter] = useState('');
     const [shardIdFilter, setShardIdFilter] = useState('');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [pollingMenuAnchor, setPollingMenuAnchor] = useState(null);
     const theme = useTheme();
+
+    const pollingMenuOpen = Boolean(pollingMenuAnchor);
 
     const sortedAndFilteredMessages = useMemo(() => {
         return messages
@@ -56,11 +78,26 @@ const MessageList = ({messages, onMessageClick}) => {
         URL.revokeObjectURL(url);
     };
 
+    const handlePollingMenuClick = (event) => {
+        setPollingMenuAnchor(event.currentTarget);
+    };
+
+    const handlePollingMenuClose = () => {
+        setPollingMenuAnchor(null);
+    };
+
+    const handleIntervalChange = (newInterval) => {
+        onUpdatePollingInterval(newInterval);
+        handlePollingMenuClose();
+    };
+
     return (
         <Box>
-            <Typography variant="h6" gutterBottom>
-                Kinesis Stream Messages
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                    Kinesis Stream Messages
+                </Typography>
+            </Box>
 
             <Typography variant="body2" sx={{mb: 3}}>
                 Use the filters below to narrow down the messages by Partition Key or Shard ID.
@@ -121,14 +158,14 @@ const MessageList = ({messages, onMessageClick}) => {
                         variant={sortOrder === 'asc' ? 'contained' : 'outlined'}
                         startIcon={<ArrowUpwardIcon/>}
                     >
-                        Oldest First
+                        Oldest
                     </Button>
                     <Button
                         onClick={() => setSortOrder('desc')}
                         variant={sortOrder === 'desc' ? 'contained' : 'outlined'}
                         startIcon={<ArrowDownwardIcon/>}
                     >
-                        Newest First
+                        Newest
                     </Button>
                 </ButtonGroup>
                 <ButtonGroup variant="outlined">
@@ -137,9 +174,76 @@ const MessageList = ({messages, onMessageClick}) => {
                         disabled={sortedAndFilteredMessages.length === 0}
                         startIcon={<DownloadIcon/>}
                     >
-                        Download JSON
+                        Download
                     </Button>
                 </ButtonGroup>
+
+                {/* Polling Controls */}
+                {isAuthenticated && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Tooltip title={isPolling ? 'Stop auto-refresh' : 'Start auto-refresh'}>
+                            <IconButton 
+                                color="primary" 
+                                onClick={onTogglePolling}
+                                size="small"
+                                sx={{ 
+                                    border: 1, 
+                                    borderColor: 'primary.main',
+                                    '&:hover': {
+                                        backgroundColor: 'primary.main',
+                                        color: 'white'
+                                    }
+                                }}
+                            >
+                                {isPolling ? <PauseIcon /> : <PlayArrowIcon />}
+                            </IconButton>
+                        </Tooltip>
+                        
+                        {isPolling && (
+                            <>
+                                <Chip 
+                                    icon={<RefreshIcon />}
+                                    label={`${pollInterval / 1000}s`}
+                                    size="small"
+                                    color="primary"
+                                    variant="outlined"
+                                    clickable
+                                    onClick={handlePollingMenuClick}
+                                />
+                                
+                                {pollStats && (
+                                    <Tooltip title={`${pollStats.successCount}/${pollStats.pollCount} successful polls`}>
+                                        <Chip 
+                                            label={`${pollStats.successCount}/${pollStats.pollCount}`}
+                                            size="small"
+                                            color={pollStats.consecutiveErrors > 0 ? "error" : "success"}
+                                            variant="outlined"
+                                        />
+                                    </Tooltip>
+                                )}
+                            </>
+                        )}
+                        
+                        <Menu
+                            anchorEl={pollingMenuAnchor}
+                            open={pollingMenuOpen}
+                            onClose={handlePollingMenuClose}
+                            PaperProps={{
+                                sx: { minWidth: 150 }
+                            }}
+                        >
+                            {POLLING_INTERVALS.map((interval) => (
+                                <MenuItem
+                                    key={interval.value}
+                                    onClick={() => handleIntervalChange(interval.value)}
+                                    selected={interval.value === pollInterval}
+                                >
+                                    {interval.label}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </Box>
+                )}
             </Box>
 
             {sortedAndFilteredMessages.map((message, index) => (

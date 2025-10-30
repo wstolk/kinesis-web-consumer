@@ -9,9 +9,11 @@ import {useKinesisMode} from '@/contexts/KinesisModeContext';
 import ErrorNotification from '@/components/ErrorNotification';
 import AuthModal from '@/components/AuthModal';
 import LogViewer from "@/components/LogViewer";
-
-const HEADER_HEIGHT = 64;
-const SIDEBAR_WIDTH = 300;
+import { usePolling } from '@/hooks/usePolling';
+import { dataFetchingService } from '@/lib/dataFetchingService';
+import { HEADER_HEIGHT, SIDEBAR_WIDTH, MAX_STORED_MESSAGES } from '@/lib/constants';
+import { loggingService } from '@/lib/loggingService';
+import { performanceMonitor } from '@/lib/performanceMonitor';
 
 export default function Home() {
     const [messages, setMessages] = useState([]);
@@ -25,8 +27,21 @@ export default function Home() {
     const [activeProfile, setActiveProfile] = useState(null);
     const [profiles, setProfiles] = useState([]);
     const [streams, setStreams] = useState([]);
+    const [lastFetchParams, setLastFetchParams] = useState(null);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
+
+    // Initialize polling hook
+    const {
+        isPolling,
+        pollInterval,
+        pollStats,
+        lastError: pollError,
+        startPolling,
+        stopPolling,
+        togglePolling,
+        updateInterval
+    } = usePolling('kinesis-main');
 
     // Load saved credentials, active profile, and stream names from localStorage
     useEffect(() => {
@@ -52,6 +67,21 @@ export default function Home() {
         }
     }, []);
 
+    // Handle polling errors
+    useEffect(() => {
+        if (pollError) {
+            setError(pollError.message);
+        }
+    }, [pollError]);
+
+    // Auto-cleanup on unmount
+    useEffect(() => {
+        return () => {
+            dataFetchingService.cancelAllRequests();
+            stopPolling();
+        };
+    }, [stopPolling]);
+
     // Fetch Kinesis data on form submit
     const handleSubmit = async (form) => {
         if (!form) {
@@ -61,40 +91,101 @@ export default function Home() {
 
         setIsLoading(true);
         setError(null);
+
+        const requestParams = {
+            ...credentials,
+            ...form,
+            useRealKinesis
+        };
+
+        // Store params for potential polling
+        setLastFetchParams(requestParams);
+
         try {
-            const response = await fetch('/api/kinesis', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...credentials,
-                    ...form,
-                    useRealKinesis
-                }),
-            });
+            loggingService.log('info', 'Fetching Kinesis data with production service');
+            const data = await dataFetchingService.fetchKinesisData(requestParams);
 
-            if (!response.ok) {
-                // Set data to empty array
-                setMessages([]);
-                const responseBody = await response.json();
-                setError(responseBody['error']);
-                throw new Error('Failed to fetch Kinesis data');
-            }
-
-            const data = await response.json();
-            setMessages(data.records.map(record => ({
+            const formattedMessages = data.records.map(record => ({
                 ...record,
                 timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', {timeZone: 'Europe/Amsterdam'}),
                 partitionKey: record.PartitionKey,
                 data: record.Data,
                 ShardId: record.ShardId || 'N/A'
-            })));
+            }));
+
+            setMessages(formattedMessages);
+            performanceMonitor.recordMemoryUsage(formattedMessages.length);
+            loggingService.log('info', `Successfully loaded ${formattedMessages.length} messages`);
+
         } catch (error) {
-            console.error('Error:', error);
+            loggingService.log('error', `Data fetch failed: ${error.message}`);
+            setMessages([]);
+            setError(error.message);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Handle polling data updates with memory management
+    const handlePollingData = (data) => {
+        const newMessages = data.records.map(record => ({
+            ...record,
+            timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', {timeZone: 'Europe/Amsterdam'}),
+            partitionKey: record.PartitionKey,
+            data: record.Data,
+            ShardId: record.ShardId || 'N/A'
+        }));
+
+        setMessages(prevMessages => {
+            // Combine new and existing messages
+            const combined = [...newMessages, ...prevMessages];
+            
+            // Remove duplicates based on a unique combination of timestamp and partition key
+            const uniqueMessages = combined.filter((message, index, self) => 
+                index === self.findIndex(m => 
+                    m.timestamp === message.timestamp && 
+                    m.partitionKey === message.partitionKey &&
+                    JSON.stringify(m.data) === JSON.stringify(message.data)
+                )
+            );
+
+            // Limit total messages for memory management
+            const limitedMessages = uniqueMessages.slice(0, MAX_STORED_MESSAGES);
+            
+            const wasCleanedUp = limitedMessages.length < uniqueMessages.length;
+            if (wasCleanedUp) {
+                loggingService.log('info', `Trimmed messages to ${MAX_STORED_MESSAGES} for memory management`);
+            }
+
+            // Record memory usage
+            performanceMonitor.recordMemoryUsage(limitedMessages.length, wasCleanedUp);
+
+            return limitedMessages;
+        });
+    };
+
+    // Handle polling errors
+    const handlePollingError = (error) => {
+        loggingService.log('warn', `Polling error: ${error.message}`);
+        setError(`Polling error: ${error.message}`);
+    };
+
+    // Start/stop polling
+    const handleTogglePolling = () => {
+        if (!lastFetchParams) {
+            setError('Please fetch data first before enabling polling');
+            return;
+        }
+
+        const success = togglePolling(lastFetchParams, handlePollingData, handlePollingError);
+        if (!success && !isPolling) {
+            setError('Failed to start polling');
+        }
+    };
+
+    // Update polling interval
+    const handleUpdatePollingInterval = (newInterval) => {
+        updateInterval(newInterval);
     };
 
     const handleMessageClick = (message) => {
@@ -244,7 +335,16 @@ export default function Home() {
                                 <CircularProgress/>
                             </Box>
                         ) : (
-                            <MessageList messages={messages} onMessageClick={handleMessageClick}/>
+                            <MessageList 
+                                messages={messages} 
+                                onMessageClick={handleMessageClick}
+                                isPolling={isPolling}
+                                onTogglePolling={handleTogglePolling}
+                                pollInterval={pollInterval}
+                                onUpdatePollingInterval={handleUpdatePollingInterval}
+                                pollStats={pollStats}
+                                isAuthenticated={isAuthenticated}
+                            />
                         )}
                     </Box>
 

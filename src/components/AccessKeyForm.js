@@ -3,25 +3,19 @@ import React, {useEffect, useState} from 'react';
 import {TextField, Button, Box, Typography, MenuItem, Collapse, IconButton, Paper} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-
-const AWS_REGIONS = [
-    "us-east-1", "us-east-2", "us-west-1", "us-west-2",
-    "af-south-1", "ap-east-1", "ap-south-1", "ap-northeast-1",
-    "ap-northeast-2", "ap-northeast-3", "ap-southeast-1", "ap-southeast-2",
-    "ca-central-1", "eu-central-1", "eu-west-1", "eu-west-2",
-    "eu-west-3", "eu-north-1", "eu-south-1", "me-south-1",
-    "sa-east-1"
-];
-
-const SHARD_ITERATOR_TYPES = [
-    "TRIM_HORIZON", "AT_TIMESTAMP"
-];
+import { 
+    AWS_REGIONS, 
+    SHARD_ITERATOR_TYPES, 
+    DEFAULT_MESSAGE_LIMIT, 
+    DEFAULT_MINUTES_AGO,
+    MAX_MESSAGES_LIMIT 
+} from '@/lib/constants';
 
 const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
     const [streamName, setStreamName] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [messageLimit, setMessageLimit] = useState(50);
-    const [minutesAgo, setMinutesAgo] = useState(30);
+    const [messageLimit, setMessageLimit] = useState(DEFAULT_MESSAGE_LIMIT);
+    const [minutesAgo, setMinutesAgo] = useState(DEFAULT_MINUTES_AGO);
     const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
     const [partitionKey, setPartitionKey] = useState('');
 
@@ -42,9 +36,16 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        
+        // Validate message limit for production safety
+        const safeMessageLimit = Math.min(Math.max(1, messageLimit), MAX_MESSAGES_LIMIT);
+        if (safeMessageLimit !== messageLimit) {
+            console.warn(`Message limit capped at ${MAX_MESSAGES_LIMIT} for performance reasons`);
+        }
+        
         const formData = {
             streamName,
-            messageLimit,
+            messageLimit: safeMessageLimit,
             shardIteratorType,
             minutesAgo,
             partitionKey: partitionKey.trim() || undefined,
@@ -107,7 +108,8 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
                     label="Number of Messages to Fetch (optional)"
                     value={messageLimit}
                     onChange={(e) => setMessageLimit(parseInt(e.target.value))}
-                    helperText="Maximum number of messages to retrieve (default: 50)"
+                    helperText={`Maximum number of messages to retrieve (max: ${MAX_MESSAGES_LIMIT})`}
+                    inputProps={{ min: 1, max: MAX_MESSAGES_LIMIT }}
                 />
                 <TextField
                     fullWidth
