@@ -46,7 +46,17 @@ export default async function handler(req, res) {
             }
         }
 
-        const redactedRequestBody = {...req.body, accessKeyId: 'REDACTED', secretAccessKey: 'REDACTED'};
+        // Validate awsProfile to prevent injection
+        if (awsProfile && (typeof awsProfile !== 'string' || !/^[a-zA-Z0-9_\-./]+$/.test(awsProfile))) {
+            return res.status(400).json({ error: 'Invalid AWS profile name.' });
+        }
+
+        // Validate streamName format (AWS Kinesis stream names: 1-128 chars, [a-zA-Z0-9_.-])
+        if (streamName.length > 128 || !/^[a-zA-Z0-9_.\-]+$/.test(streamName)) {
+            return res.status(400).json({ error: 'Invalid stream name format.' });
+        }
+
+        const redactedRequestBody = {...req.body, accessKeyId: 'REDACTED', secretAccessKey: 'REDACTED', sessionToken: 'REDACTED'};
         loggingService.log('info', `Fetching Kinesis data for stream ${streamName}`);
         loggingService.log('debug', `Request body: ${JSON.stringify(redactedRequestBody)}`);
 
