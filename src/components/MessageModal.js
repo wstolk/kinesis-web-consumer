@@ -47,7 +47,7 @@ const MessageModal = ({message, open, onClose}) => {
                     <Typography variant="subtitle1">
                         Message Content:
                     </Typography>
-                    <IconButton onClick={handleCopy} size="small" title="Copy to clipboard">
+                    <IconButton onClick={handleCopy} size="small" aria-label="Copy to clipboard">
                         <ContentCopyIcon />
                     </IconButton>
                 </Box>
@@ -55,8 +55,8 @@ const MessageModal = ({message, open, onClose}) => {
                     sx={{
                         flexGrow: 1,
                         overflow: 'auto',
-                        backgroundColor: '#282a36',
-                        color: '#f8f8f2',
+                        backgroundColor: 'grey.900',
+                        color: 'grey.100',
                         padding: 2,
                         borderRadius: 1,
                         fontFamily: 'monospace',

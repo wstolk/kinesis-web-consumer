@@ -31,7 +31,7 @@ Built with Next.js, React, Material-UI, and the AWS SDK for JavaScript (v3).
 - **JSON export** -- download filtered messages as a JSON file
 - **Mock data mode** -- develop and test without AWS credentials
 - **Custom endpoints** -- connect to LocalStack or other AWS-compatible services
-- **Production-ready** -- connection pooling, request throttling, deduplication, exponential backoff, memory limits
+- **Production-ready** -- connection pooling, request throttling, deduplication, exponential backoff, memory limits, virtualized list rendering
 - **Docker support** -- multi-platform images (amd64/arm64) with credential mounting
 - **Real-time logs** -- server-sent events log viewer built into the UI
 
@@ -126,10 +126,13 @@ This creates a `my-stream` Kinesis stream on `localhost:4566`. In the app, use t
 
 ```bash
 docker logs kinesis-web-consumer      # View logs
+docker inspect --format='{{.State.Health.Status}}' kinesis-web-consumer  # Check health
 docker restart kinesis-web-consumer   # Restart
 docker stop kinesis-web-consumer      # Stop
 docker rm kinesis-web-consumer        # Remove
 ```
+
+The container includes a built-in healthcheck that polls `http://localhost:3000/` every 30 seconds.
 
 ---
 
@@ -254,6 +257,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 - AWS operations run server-side; credentials are not exposed to the browser when using profiles or default chain
 - Docker images run as a non-root user (UID 1001) and are signed with cosign
+- Security headers enforced (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and others)
 - Request throttling and circuit breakers protect against runaway polling
 - Credential redaction is applied in all log output
 

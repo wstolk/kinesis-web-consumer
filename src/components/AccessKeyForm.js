@@ -96,7 +96,7 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
             )}
             <Box sx={{display: 'flex', alignItems: 'center', mt: 2, mb: 1}}>
                 <Typography variant="subtitle1">Advanced Settings</Typography>
-                <IconButton onClick={() => setShowAdvanced(!showAdvanced)} size="small">
+                <IconButton onClick={() => setShowAdvanced(!showAdvanced)} size="small" aria-label={showAdvanced ? 'Hide advanced settings' : 'Show advanced settings'}>
                     {showAdvanced ? <ExpandLessIcon/> : <ExpandMoreIcon/>}
                 </IconButton>
             </Box>

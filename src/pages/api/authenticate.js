@@ -16,6 +16,11 @@ export default async function handler(req, res) {
             return res.status(400).json({ authenticated: false, message: 'accessKeyId and secretAccessKey are required when not using default credentials' });
         }
 
+        // Validate awsProfile to prevent injection into filesystem operations
+        if (awsProfile && (typeof awsProfile !== 'string' || !/^[a-zA-Z0-9_\-./]+$/.test(awsProfile))) {
+            return res.status(400).json({ authenticated: false, message: 'Invalid AWS profile name.' });
+        }
+
         let client;
         try {
             const clientConfig = {

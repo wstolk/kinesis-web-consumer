@@ -148,6 +148,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                 {/* Close Button */}
                 <IconButton
                     onClick={onClose}
+                    aria-label="Close authentication modal"
                     sx={{
                         position: 'absolute',
                         right: 8,
@@ -229,6 +230,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                     <IconButton
                                         edge="end"
                                         onClick={(e) => handleEditProfile(e, profile)}
+                                        aria-label={`Edit profile ${profile.name}`}
                                         sx={{mr: 1}}
                                     >
                                         <EditIcon/>
@@ -236,6 +238,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                     <IconButton
                                         edge="end"
                                         onClick={(e) => handleDeleteProfile(e, profile.name)}
+                                        aria-label={`Delete profile ${profile.name}`}
                                     >
                                         <DeleteIcon/>
                                     </IconButton>

@@ -26,10 +26,17 @@ class LoggingService {
     }
 
     log(level, message) {
+        // Sanitize log message to prevent log injection
+        const validLevels = ['debug', 'info', 'warn', 'error'];
+        const sanitizedLevel = validLevels.includes(level) ? level : 'info';
+        const sanitizedMessage = typeof message === 'string'
+            ? message.replace(/[\r\n]/g, ' ').slice(0, 2000)
+            : String(message).replace(/[\r\n]/g, ' ').slice(0, 2000);
+
         const logEntry = {
             timestamp: new Date().toISOString(),
-            level,
-            message
+            level: sanitizedLevel,
+            message: sanitizedMessage
         };
 
         this.loggers.forEach(res => {
