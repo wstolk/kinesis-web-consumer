@@ -60,7 +60,7 @@ const MessageModal = ({message, open, onClose}) => {
                 borderBottom: '1px solid',
                 borderColor: 'surface.border',
             }}>
-                <Typography variant="subtitle1" sx={{fontWeight: 600}}>
+                <Typography variant="subtitle1" component="span" sx={{fontWeight: 600}}>
                     Message Details
                 </Typography>
                 <IconButton size="small" onClick={onClose} aria-label="Close">

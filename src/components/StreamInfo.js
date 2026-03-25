@@ -256,7 +256,7 @@ const StreamDetailModal = ({ open, onClose, streamInfo }) => {
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <StorageIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    <Typography variant="subtitle1" component="span" sx={{ fontWeight: 600 }}>
                         Stream Details
                     </Typography>
                 </Box>

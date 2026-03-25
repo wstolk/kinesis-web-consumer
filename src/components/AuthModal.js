@@ -55,10 +55,17 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
             const data = await response.json();
 
             if (response.ok) {
-                setAwsProfiles(data.profiles || []);
-                const defaultProfile = data.profiles?.find(p => p.profileName === 'default');
-                if (defaultProfile && defaultProfile.region) {
-                    setFormData(prev => ({...prev, region: defaultProfile.region}));
+                const profiles = data.profiles || [];
+                setAwsProfiles(profiles);
+                // Auto-select the default profile, or the first available one
+                const defaultProfile = profiles.find(p => p.profileName === 'default');
+                const selectedProfile = defaultProfile || profiles[0];
+                if (selectedProfile) {
+                    setFormData(prev => ({
+                        ...prev,
+                        awsProfile: selectedProfile.profileName,
+                        ...(selectedProfile.region && {region: selectedProfile.region}),
+                    }));
                 }
             } else {
                 setAwsProfiles([]);
