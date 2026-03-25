@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -30,11 +30,11 @@ jobs:
         id: audit
         run: |
           # Capture full audit output
-          npm audit --production > audit-report.txt 2>&1 || true
+          npm audit --omit=dev > audit-report.txt 2>&1 || true
           cat audit-report.txt
 
           # Check for high/critical vulnerabilities
-          if npm audit --audit-level=high --production > /dev/null 2>&1; then
+          if npm audit --audit-level=high --omit=dev > /dev/null 2>&1; then
             echo "has_vulnerabilities=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_vulnerabilities=true" >> "$GITHUB_OUTPUT"
