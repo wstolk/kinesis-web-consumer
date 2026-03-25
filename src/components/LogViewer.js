@@ -4,18 +4,18 @@ import {
     Box,
     Typography,
     IconButton,
-    TextField,
-    InputAdornment,
+    InputBase,
     Collapse,
-    Tooltip
+    Tooltip,
+    useTheme,
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 
 const MAX_LOG_ENTRIES = 500;
+const LOG_BAR_HEIGHT = 36;
 
 const LogViewer = ({sidebarWidth}) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -23,13 +23,12 @@ const LogViewer = ({sidebarWidth}) => {
     const [filterText, setFilterText] = useState('');
     const logsEndRef = useRef(null);
     const eventSourceRef = useRef(null);
+    const theme = useTheme();
 
     useEffect(() => {
-        console.log('Setting up EventSource');
         eventSourceRef.current = new EventSource('/api/logs');
 
         eventSourceRef.current.onopen = () => {
-            console.log('SSE connection opened');
             setLogs(prev => [...prev, {
                 timestamp: new Date().toISOString(),
                 level: 'info',
@@ -42,7 +41,6 @@ const LogViewer = ({sidebarWidth}) => {
                 const newLog = JSON.parse(event.data);
                 setLogs(prevLogs => {
                     const updated = [...prevLogs, newLog];
-                    // Cap log entries to prevent unbounded memory growth
                     if (updated.length > MAX_LOG_ENTRIES) {
                         return updated.slice(-MAX_LOG_ENTRIES);
                     }
@@ -95,6 +93,15 @@ const LogViewer = ({sidebarWidth}) => {
         );
     }, [logs, filterText, formatTimestamp]);
 
+    const getLevelColor = (level) => {
+        switch (level) {
+            case 'error': return theme.palette.error.main;
+            case 'warn': return theme.palette.warning.main;
+            case 'info': return theme.palette.primary.light;
+            default: return theme.palette.text.secondary;
+        }
+    };
+
     return (
         <Box
             sx={{
@@ -102,11 +109,11 @@ const LogViewer = ({sidebarWidth}) => {
                 bottom: 0,
                 right: 0,
                 width: `calc(100% - ${sidebarWidth}px)`,
-                height: isOpen ? '40%' : '48px',
-                backgroundColor: 'background.paper',
-                transition: 'height 0.3s ease',
-                borderTop: 1,
-                borderColor: 'divider',
+                height: isOpen ? '35%' : `${LOG_BAR_HEIGHT}px`,
+                bgcolor: 'background.paper',
+                transition: 'height 0.2s cubic-bezier(0.25, 1, 0.5, 1)',
+                borderTop: '1px solid',
+                borderColor: 'surface.border',
                 zIndex: 1200,
                 display: 'flex',
                 flexDirection: 'column',
@@ -115,14 +122,15 @@ const LogViewer = ({sidebarWidth}) => {
             {/* Header */}
             <Box
                 sx={{
-                    height: '48px', // Fixed height for header
-                    minHeight: '48px', // Ensure minimum height
-                    p: 1,
+                    height: LOG_BAR_HEIGHT,
+                    minHeight: LOG_BAR_HEIGHT,
+                    px: 1,
                     display: 'flex',
                     alignItems: 'center',
-                    borderBottom: isOpen ? 1 : 0,
-                    borderColor: 'divider',
-                    backgroundColor: 'grey.100',
+                    borderBottom: isOpen ? '1px solid' : 'none',
+                    borderColor: 'surface.border',
+                    bgcolor: 'surface.main',
+                    gap: 0.5,
                 }}
             >
                 <Box
@@ -131,59 +139,80 @@ const LogViewer = ({sidebarWidth}) => {
                         display: 'flex',
                         alignItems: 'center',
                         cursor: 'pointer',
-                        flexGrow: 0,
-                        mr: 2
+                        flexShrink: 0,
+                        mr: 1,
+                        '&:hover': {color: 'text.primary'},
+                        color: 'text.secondary',
                     }}
                 >
-                    <IconButton size="small" aria-label={isOpen ? 'Collapse log viewer' : 'Expand log viewer'}>
-                        {isOpen ? <KeyboardArrowDownIcon/> : <KeyboardArrowUpIcon/>}
+                    <IconButton size="small" sx={{p: 0.25}} aria-label={isOpen ? 'Collapse log viewer' : 'Expand log viewer'}>
+                        {isOpen ? <KeyboardArrowDownIcon sx={{fontSize: 18}} /> : <KeyboardArrowUpIcon sx={{fontSize: 18}} />}
                     </IconButton>
-                    <Typography variant="subtitle2" sx={{fontWeight: 'bold', ml: 1}}>
-                        API Logs ({filteredLogs.length})
+                    <Typography variant="caption" sx={{fontWeight: 600, ml: 0.5, fontSize: '0.75rem'}}>
+                        Logs
+                    </Typography>
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            ml: 0.5,
+                            fontSize: '0.6875rem',
+                            fontFamily: theme.typography.mono,
+                            color: 'text.secondary',
+                            opacity: 0.7,
+                        }}
+                    >
+                        {filteredLogs.length}
                     </Typography>
                 </Box>
 
                 <Collapse in={isOpen} orientation="horizontal" sx={{flexGrow: 1}}>
-                    <TextField
-                        size="small"
-                        placeholder="Filter logs..."
-                        value={filterText}
-                        onChange={(e) => setFilterText(e.target.value)}
-                        inputProps={{ 'aria-label': 'Filter logs' }}
-                        sx={{
-                            width: '300px',
-                            '& .MuiOutlinedInput-root': {
-                                backgroundColor: 'white'
-                            }
-                        }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small"/>
-                                </InputAdornment>
-                            ),
-                            endAdornment: filterText && (
-                                <InputAdornment position="end">
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => setFilterText('')}
-                                        aria-label="Clear filter"
-                                    >
-                                        <CloseIcon fontSize="small"/>
-                                    </IconButton>
-                                </InputAdornment>
-                            )
-                        }}
-                    />
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        height: 26,
+                        border: '1px solid',
+                        borderColor: 'surface.border',
+                        borderRadius: '4px',
+                        bgcolor: 'background.paper',
+                        px: 1,
+                        width: 240,
+                    }}>
+                        <InputBase
+                            placeholder="Filter..."
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            inputProps={{'aria-label': 'Filter logs'}}
+                            sx={{
+                                flex: 1,
+                                fontFamily: theme.typography.mono,
+                                fontSize: '0.75rem',
+                                '& input::placeholder': {
+                                    fontFamily: theme.typography.mono,
+                                    fontSize: '0.75rem',
+                                    opacity: 0.5,
+                                },
+                            }}
+                        />
+                        {filterText && (
+                            <IconButton
+                                size="small"
+                                onClick={() => setFilterText('')}
+                                aria-label="Clear filter"
+                                sx={{p: 0.25}}
+                            >
+                                <CloseIcon sx={{fontSize: 14}} />
+                            </IconButton>
+                        )}
+                    </Box>
                 </Collapse>
 
                 <Tooltip title="Clear logs">
                     <IconButton
                         size="small"
                         onClick={handleClearLogs}
-                        sx={{ml: 1}}
+                        sx={{ml: 'auto', color: 'text.secondary', p: 0.5}}
                     >
-                        <DeleteIcon/>
+                        <DeleteIcon sx={{fontSize: 16}} />
                     </IconButton>
                 </Tooltip>
             </Box>
@@ -194,27 +223,62 @@ const LogViewer = ({sidebarWidth}) => {
                     sx={{
                         flexGrow: 1,
                         overflow: 'auto',
-                        backgroundColor: 'grey.900',
-                        color: 'grey.100',
-                        p: 2,
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.3)' : 'grey.50',
+                        px: 1.5,
+                        py: 0.5,
                     }}
                 >
                     {filteredLogs.map((log, index) => (
                         <Box
                             key={index}
                             sx={{
-                                mb: 0.5,
-                                color: log.level === 'error' ? 'error.light' :
-                                    log.level === 'warn' ? 'warning.light' : 'grey.100',
-                                fontFamily: 'monospace',
+                                py: 0.15,
+                                fontFamily: theme.typography.mono,
+                                display: 'flex',
+                                gap: 1,
+                                alignItems: 'baseline',
                             }}
                         >
-                            <Typography variant="body2" sx={{fontFamily: 'monospace'}}>
-                                {`[${formatTimestamp(log.timestamp)}] ${log.level.toUpperCase()}: ${log.message}`}
+                            <Typography
+                                component="span"
+                                sx={{
+                                    fontFamily: theme.typography.mono,
+                                    fontSize: '0.75rem',
+                                    color: 'text.secondary',
+                                    opacity: 0.6,
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {formatTimestamp(log.timestamp)}
+                            </Typography>
+                            <Typography
+                                component="span"
+                                sx={{
+                                    fontFamily: theme.typography.mono,
+                                    fontSize: '0.6875rem',
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    color: getLevelColor(log.level),
+                                    flexShrink: 0,
+                                    minWidth: 36,
+                                }}
+                            >
+                                {log.level}
+                            </Typography>
+                            <Typography
+                                component="span"
+                                sx={{
+                                    fontFamily: theme.typography.mono,
+                                    fontSize: '0.75rem',
+                                    color: 'text.primary',
+                                    wordBreak: 'break-word',
+                                }}
+                            >
+                                {log.message}
                             </Typography>
                         </Box>
                     ))}
-                    <div ref={logsEndRef}/>
+                    <div ref={logsEndRef} />
                 </Box>
             )}
         </Box>

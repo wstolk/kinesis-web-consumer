@@ -18,7 +18,8 @@ export default async function handler(req, res) {
             minutesAgo,
             useRealKinesis,
             useDefaultCredentials,
-            awsProfile
+            awsProfile,
+            endpoint
         } = req.body;
 
         // Input validation
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
                 });
             } else {
                 // Use real Kinesis
-                client = createKinesisClient(accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials, awsProfile);
+                client = createKinesisClient(accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials, awsProfile, endpoint);
                 data = await getAllShardRecords(client, streamName, shardIteratorType, sanitizedMessageLimit, minutesAgo, partitionKey);
             }
 

@@ -5,7 +5,7 @@
  */
 
 // UI Layout Constants
-export const HEADER_HEIGHT = 64;
+export const HEADER_HEIGHT = 44;
 export const SIDEBAR_WIDTH = 300;
 
 // AWS Regions List
@@ -20,8 +20,9 @@ export const AWS_REGIONS = [
 
 // Kinesis Configuration
 export const SHARD_ITERATOR_TYPES = [
-    "TRIM_HORIZON", 
-    "AT_TIMESTAMP"
+    "TRIM_HORIZON",
+    "AT_TIMESTAMP",
+    "LATEST"
 ];
 
 export const DEFAULT_MESSAGE_LIMIT = 50;

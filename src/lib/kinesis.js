@@ -15,6 +15,114 @@ const MAX_RETRIES = 3;
 const EMPTY_RESPONSE_RETRY_DELAY = 1000;
 const MAX_EMPTY_RETRIES = 3;
 
+// Server-side iterator cache for polling sessions
+// Key: sessionId, Value: { client, streamName, shardIterators: Map<shardId, nextIterator>, lastAccess }
+const pollingSessions = new Map();
+const SESSION_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+const cleanupStaleSessions = () => {
+    const now = Date.now();
+    for (const [id, session] of pollingSessions) {
+        if (now - session.lastAccess > SESSION_TTL_MS) {
+            if (session.client) {
+                try { session.client.destroy(); } catch (e) { /* ignore */ }
+            }
+            pollingSessions.delete(id);
+            loggingService.log('debug', `Cleaned up stale polling session: ${id}`);
+        }
+    }
+};
+
+export const createPollingSession = (sessionId, client, streamName) => {
+    cleanupStaleSessions();
+    // Destroy existing session client if present
+    const existing = pollingSessions.get(sessionId);
+    if (existing?.client) {
+        try { existing.client.destroy(); } catch (e) { /* ignore */ }
+    }
+    pollingSessions.set(sessionId, {
+        client,
+        streamName,
+        shardIterators: new Map(),
+        lastAccess: Date.now(),
+    });
+    loggingService.log('info', `Created polling session: ${sessionId}`);
+};
+
+export const destroyPollingSession = (sessionId) => {
+    const session = pollingSessions.get(sessionId);
+    if (session?.client) {
+        try { session.client.destroy(); } catch (e) { /* ignore */ }
+    }
+    pollingSessions.delete(sessionId);
+};
+
+/**
+ * Fetch new records for a polling session using stored iterators.
+ * On first call per shard, uses LATEST. On subsequent calls, uses nextShardIterator.
+ */
+export const pollShardRecords = async (sessionId, messageLimit, partitionKey) => {
+    const session = pollingSessions.get(sessionId);
+    if (!session) {
+        throw new Error('Polling session not found. Please start polling again.');
+    }
+    session.lastAccess = Date.now();
+
+    const { client, streamName, shardIterators } = session;
+    const streamDescription = await describeStream(client, streamName);
+    const shards = streamDescription.Shards;
+
+    let allRecords = [];
+    let totalRecords = 0;
+    const effectivePartitionKey = partitionKey === '' ? null : partitionKey;
+
+    for (const shard of shards) {
+        let shardIterator = shardIterators.get(shard.ShardId);
+
+        // First poll for this shard — use LATEST to only get new records
+        if (!shardIterator) {
+            shardIterator = await getShardIterator(client, streamName, shard.ShardId, 'LATEST', null);
+            loggingService.log('info', `Initialized LATEST iterator for shard ${shard.ShardId}`);
+        }
+
+        try {
+            const { records, nextShardIterator } = await getRecords(client, shardIterator, messageLimit - totalRecords);
+
+            // Store the next iterator for the next poll
+            if (nextShardIterator) {
+                shardIterators.set(shard.ShardId, nextShardIterator);
+            }
+
+            let filteredRecords = records;
+            if (effectivePartitionKey) {
+                filteredRecords = records.filter(r => r.PartitionKey === effectivePartitionKey);
+            }
+
+            const processedRecords = filteredRecords.map(record => ({
+                ...record,
+                ShardId: shard.ShardId,
+            }));
+
+            allRecords = allRecords.concat(processedRecords);
+            totalRecords += filteredRecords.length;
+
+            if (totalRecords >= messageLimit) break;
+        } catch (error) {
+            if (error instanceof ExpiredIteratorException) {
+                // Re-initialize with LATEST
+                loggingService.log('warn', `Iterator expired for shard ${shard.ShardId}, re-initializing`);
+                const newIterator = await getShardIterator(client, streamName, shard.ShardId, 'LATEST', null);
+                shardIterators.set(shard.ShardId, newIterator);
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    loggingService.log('info', `Poll returned ${totalRecords} new records`);
+    return { records: allRecords };
+};
+
 /**
  * Creates a Kinesis client with the specified authentication method
  * @param {string} accessKeyId - AWS access key ID (for manual credentials)
@@ -25,7 +133,7 @@ const MAX_EMPTY_RETRIES = 3;
  * @param {string} awsProfile - AWS profile name (when using profiles)
  * @returns {KinesisClient} Configured Kinesis client
  */
-export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials = false, awsProfile = null) => {
+export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials = false, awsProfile = null, endpoint = null) => {
     const clientConfig = { region };
 
     if (useDefaultCredentials) {
@@ -47,6 +155,23 @@ export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, 
             sessionToken: resolvedSessionToken
         };
         loggingService.log('info', `Creating Kinesis client for region ${region} using manual credentials`);
+    }
+
+    // Add custom endpoint if provided (e.g. LocalStack)
+    if (endpoint) {
+        try {
+            const parsedUrl = new URL(endpoint);
+            const allowedProtocols = ['http:', 'https:'];
+            if (allowedProtocols.includes(parsedUrl.protocol)) {
+                clientConfig.endpoint = endpoint;
+                if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+                    clientConfig.tls = false;
+                }
+                loggingService.log('info', `Using custom endpoint: ${endpoint}`);
+            }
+        } catch (e) {
+            loggingService.log('warn', `Invalid endpoint URL ignored: ${endpoint}`);
+        }
     }
 
     return new KinesisClient(clientConfig);
@@ -260,5 +385,20 @@ export const getAllShardRecords = async (client, streamName, shardIteratorType, 
     return {
         records: allRecords,
         millisBehindLatest: millisValues.length > 0 ? Math.max(...millisValues) : 0,
+        streamInfo: {
+            streamName: streamDescription.StreamName,
+            streamARN: streamDescription.StreamARN,
+            streamStatus: streamDescription.StreamStatus,
+            streamMode: streamDescription.StreamModeDetails?.StreamMode || 'PROVISIONED',
+            retentionPeriodHours: streamDescription.RetentionPeriodHours,
+            encryptionType: streamDescription.EncryptionType || 'NONE',
+            shardCount: shards.length,
+            shards: shards.map(s => ({
+                shardId: s.ShardId,
+                parentShardId: s.ParentShardId || null,
+                startingHashKey: s.HashKeyRange?.StartingHashKey,
+                endingHashKey: s.HashKeyRange?.EndingHashKey,
+            })),
+        },
     };
 };

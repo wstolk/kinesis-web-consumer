@@ -1,19 +1,22 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {Box, AppBar, Toolbar, CircularProgress} from '@mui/material';
+import React, {useState, useEffect, useCallback, lazy, Suspense} from 'react';
+import {Box, CircularProgress} from '@mui/material';
 import {useTheme} from '@mui/material/styles';
 import MessageList from '@/components/MessageList';
-import MessageModal from '@/components/MessageModal';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import {useKinesisMode} from '@/contexts/KinesisModeContext';
 import ErrorNotification from '@/components/ErrorNotification';
-import AuthModal from '@/components/AuthModal';
-import LogViewer from "@/components/LogViewer";
-import { usePolling } from '@/hooks/usePolling';
-import { dataFetchingService } from '@/lib/dataFetchingService';
-import { HEADER_HEIGHT, SIDEBAR_WIDTH, MAX_STORED_MESSAGES } from '@/lib/constants';
-import { loggingService } from '@/lib/loggingService';
-import { performanceMonitor } from '@/lib/performanceMonitor';
+import LogViewer from '@/components/LogViewer';
+
+// Lazy load dialogs — not needed at first paint
+const MessageModal = lazy(() => import('@/components/MessageModal'));
+const AuthModal = lazy(() => import('@/components/AuthModal'));
+import {usePolling} from '@/hooks/usePolling';
+import {dataFetchingService} from '@/lib/dataFetchingService';
+import {HEADER_HEIGHT, SIDEBAR_WIDTH, MAX_STORED_MESSAGES} from '@/lib/constants';
+import {loggingService} from '@/lib/loggingService';
+import {performanceMonitor} from '@/lib/performanceMonitor';
+import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
 export default function Home() {
     const [messages, setMessages] = useState([]);
@@ -28,6 +31,8 @@ export default function Home() {
     const [profiles, setProfiles] = useState([]);
     const [streams, setStreams] = useState([]);
     const [lastFetchParams, setLastFetchParams] = useState(null);
+    const [pollSessionId, setPollSessionId] = useState(null);
+    const [streamInfo, setStreamInfo] = useState(null);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
@@ -45,9 +50,9 @@ export default function Home() {
 
     // Load saved credentials, active profile, and stream names from localStorage
     useEffect(() => {
-        const savedCredentials = JSON.parse(localStorage.getItem('awsCredentials'));
+        const savedCredentials = safeGetJSON('awsCredentials');
         const lastUsedProfile = localStorage.getItem('lastUsedProfile');
-        const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
+        const savedProfiles = safeGetJSON('awsProfiles', []);
 
         setProfiles(savedProfiles);
 
@@ -56,13 +61,11 @@ export default function Home() {
             setActiveProfile(lastUsedProfile);
             setIsAuthenticated(true);
 
-            // Stream names are retrieved on authentication check in the backend and cached in localStorage
-            const savedStreams = JSON.parse(localStorage.getItem('awsStreams'));
+            const savedStreams = safeGetJSON('awsStreams');
             if (savedStreams) {
                 setStreams(savedStreams);
             }
         } else {
-            // Open auth modal if no credentials are saved
             setIsAuthModalOpen(true);
         }
     }, []);
@@ -74,11 +77,18 @@ export default function Home() {
         }
     }, [pollError]);
 
-    // Auto-cleanup on unmount
+    // Track pollSessionId in a ref so cleanup doesn't re-trigger on changes
+    const pollSessionIdRef = React.useRef(null);
+    pollSessionIdRef.current = pollSessionId;
+
+    // Auto-cleanup on unmount only
     useEffect(() => {
         return () => {
             dataFetchingService.cancelAllRequests();
             stopPolling();
+            if (pollSessionIdRef.current) {
+                dataFetchingService.stopPollingSession(pollSessionIdRef.current);
+            }
         };
     }, [stopPolling]);
 
@@ -98,7 +108,6 @@ export default function Home() {
             useRealKinesis
         };
 
-        // Store params for potential polling
         setLastFetchParams(requestParams);
 
         try {
@@ -114,6 +123,9 @@ export default function Home() {
             }));
 
             setMessages(formattedMessages);
+            if (data.streamInfo) {
+                setStreamInfo(data.streamInfo);
+            }
             performanceMonitor.recordMemoryUsage(formattedMessages.length);
             loggingService.log('info', `Successfully loaded ${formattedMessages.length} messages`);
 
@@ -137,53 +149,81 @@ export default function Home() {
         }));
 
         setMessages(prevMessages => {
-            // Combine new and existing messages
-            const combined = [...newMessages, ...prevMessages];
-            
-            // Remove duplicates based on a unique combination of timestamp and partition key
-            const uniqueMessages = combined.filter((message, index, self) => 
-                index === self.findIndex(m => 
-                    m.timestamp === message.timestamp && 
-                    m.partitionKey === message.partitionKey &&
-                    JSON.stringify(m.data) === JSON.stringify(message.data)
-                )
-            );
+            // Use a Set for O(n) deduplication instead of O(n^2) findIndex + JSON.stringify
+            const seen = new Set();
+            const makeKey = (m) => `${m.timestamp}|${m.partitionKey}|${m.SequenceNumber || ''}`;
+            prevMessages.forEach(m => seen.add(makeKey(m)));
 
-            // Limit total messages for memory management
-            const limitedMessages = uniqueMessages.slice(0, MAX_STORED_MESSAGES);
-            
-            const wasCleanedUp = limitedMessages.length < uniqueMessages.length;
+            const unique = [...prevMessages];
+            for (const m of newMessages) {
+                const key = makeKey(m);
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.unshift(m);
+                }
+            }
+
+            const limitedMessages = unique.slice(0, MAX_STORED_MESSAGES);
+
+            const wasCleanedUp = limitedMessages.length < unique.length;
             if (wasCleanedUp) {
                 loggingService.log('info', `Trimmed messages to ${MAX_STORED_MESSAGES} for memory management`);
             }
 
-            // Record memory usage
             performanceMonitor.recordMemoryUsage(limitedMessages.length, wasCleanedUp);
 
             return limitedMessages;
         });
     };
 
-    // Handle polling errors
     const handlePollingError = (error) => {
         loggingService.log('warn', `Polling error: ${error.message}`);
         setError(`Polling error: ${error.message}`);
     };
 
-    // Start/stop polling
-    const handleTogglePolling = () => {
+    const handleTogglePolling = async () => {
         if (!lastFetchParams) {
             setError('Please fetch data first before enabling polling');
             return;
         }
 
-        const success = togglePolling(lastFetchParams, handlePollingData, handlePollingError);
-        if (!success && !isPolling) {
-            setError('Failed to start polling');
+        if (isPolling) {
+            // Stop polling — clean up server session
+            togglePolling(null, null, null);
+            if (pollSessionId) {
+                dataFetchingService.stopPollingSession(pollSessionId);
+                setPollSessionId(null);
+            }
+            return;
+        }
+
+        // Start a server-side polling session
+        const sessionId = `poll-${Date.now()}`;
+        try {
+            await dataFetchingService.startPollingSession(sessionId, lastFetchParams);
+            setPollSessionId(sessionId);
+
+            // Custom fetch function that polls the server-side session
+            const pollFetchFn = async () => {
+                return dataFetchingService.pollRecords(
+                    sessionId,
+                    lastFetchParams.messageLimit || 100,
+                    lastFetchParams.partitionKey
+                );
+            };
+
+            const success = togglePolling(lastFetchParams, handlePollingData, handlePollingError, pollFetchFn);
+            if (!success) {
+                dataFetchingService.stopPollingSession(sessionId);
+                setPollSessionId(null);
+                setError('Failed to start polling');
+            }
+        } catch (err) {
+            loggingService.log('error', `Failed to start polling session: ${err.message}`);
+            setError(`Failed to start polling: ${err.message}`);
         }
     };
 
-    // Update polling interval
     const handleUpdatePollingInterval = (newInterval) => {
         updateInterval(newInterval);
     };
@@ -201,9 +241,7 @@ export default function Home() {
     }, []);
 
     const handleCloseError = useCallback((event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
+        if (reason === 'clickaway') return;
         setError(null);
     }, []);
 
@@ -215,34 +253,29 @@ export default function Home() {
         setIsAuthModalOpen(false);
     }, []);
 
-    // Handle authentication form submit and store resulting streams in localStorage
     const handleAuthSubmit = (newCredentials, authResponse) => {
         setCredentials(newCredentials);
         setActiveProfile(newCredentials.name);
         setIsAuthenticated(true);
         setIsAuthModalOpen(false);
 
-        // Update profiles in state and localStorage
-        const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
+        const savedProfiles = safeGetJSON('awsProfiles', []);
         setProfiles(savedProfiles);
 
-        localStorage.setItem('awsCredentials', JSON.stringify(newCredentials));
+        safeSetJSON('awsCredentials', newCredentials);
         localStorage.setItem('lastUsedProfile', newCredentials.name);
 
         if (authResponse.streams) {
             setStreams(authResponse.streams);
-            localStorage.setItem('awsStreams', JSON.stringify(authResponse.streams));
+            safeSetJSON('awsStreams', authResponse.streams);
         }
     };
 
-    // Handle profile selection
     const handleProfileSelect = async (profile) => {
         try {
             const response = await fetch('/api/authenticate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profile),
             });
 
@@ -252,12 +285,12 @@ export default function Home() {
                 setCredentials(profile);
                 setActiveProfile(profile.name);
                 setIsAuthenticated(true);
-                localStorage.setItem('awsCredentials', JSON.stringify(profile));
+                safeSetJSON('awsCredentials', profile);
                 localStorage.setItem('lastUsedProfile', profile.name);
 
                 if (data.streams) {
                     setStreams(data.streams);
-                    localStorage.setItem('awsStreams', JSON.stringify(data.streams));
+                    safeSetJSON('awsStreams', data.streams);
                 }
             } else {
                 setError(data.message || 'Failed to authenticate with selected profile');
@@ -268,21 +301,21 @@ export default function Home() {
         }
     };
 
+    const sidebarWidth = sidebarVisible ? SIDEBAR_WIDTH : 0;
+
     return (
-        <Box sx={{display: 'flex', flexDirection: 'column', height: '100vh'}}>
+        <Box sx={{display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default'}}>
             {/* Header */}
-            <AppBar position="fixed" sx={{zIndex: theme.zIndex.drawer + 1}}>
-                <Toolbar>
-                    <Header
-                        onOpenAuthModal={handleOpenAuthModal}
-                        isAuthenticated={isAuthenticated}
-                        onToggleSidebar={handleToggleSidebar}
-                        profiles={profiles}
-                        activeProfileName={activeProfile}
-                        onProfileSelect={handleProfileSelect}
-                    />
-                </Toolbar>
-            </AppBar>
+            <Box sx={{position: 'fixed', top: 0, left: 0, right: 0, zIndex: theme.zIndex.drawer + 1}}>
+                <Header
+                    onOpenAuthModal={handleOpenAuthModal}
+                    isAuthenticated={isAuthenticated}
+                    onToggleSidebar={handleToggleSidebar}
+                    profiles={profiles}
+                    activeProfileName={activeProfile}
+                    onProfileSelect={handleProfileSelect}
+                />
+            </Box>
 
             {/* Main content */}
             <Box sx={{display: 'flex', pt: `${HEADER_HEIGHT}px`, height: '100%'}}>
@@ -291,6 +324,8 @@ export default function Home() {
                     isVisible={sidebarVisible}
                     onSubmit={handleSubmit}
                     streams={streams}
+                    isLoading={isLoading}
+                    streamInfo={streamInfo}
                     sx={{
                         width: SIDEBAR_WIDTH,
                         flexShrink: 0,
@@ -298,7 +333,7 @@ export default function Home() {
                             width: SIDEBAR_WIDTH,
                             boxSizing: 'border-box',
                             height: `calc(100% - ${HEADER_HEIGHT}px)`,
-                            top: `${HEADER_HEIGHT}px`
+                            top: `${HEADER_HEIGHT}px`,
                         },
                     }}
                 />
@@ -308,9 +343,11 @@ export default function Home() {
                     component="main"
                     sx={{
                         flexGrow: 1,
-                        p: 2,
-                        width: {sm: `calc(100% - ${sidebarVisible ? SIDEBAR_WIDTH : 0}px)`},
-                        bgcolor: theme.palette.background.paper,
+                        pt: 0.75,
+                        px: 1,
+                        pb: 0,
+                        width: {sm: `calc(100% - ${sidebarWidth}px)`},
+                        bgcolor: 'background.default',
                         ml: {sm: sidebarVisible ? 0 : `-${SIDEBAR_WIDTH}px`},
                         transition: theme.transitions.create(['margin', 'width'], {
                             easing: theme.transitions.easing.sharp,
@@ -318,7 +355,6 @@ export default function Home() {
                         }),
                     }}
                 >
-                    {/* Message list (or loading spinner) */}
                     <Box sx={{height: '100%', overflow: 'auto', position: 'relative'}}>
                         {isLoading ? (
                             <Box sx={{
@@ -327,16 +363,13 @@ export default function Home() {
                                 alignItems: 'center',
                                 height: '100%',
                                 position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
+                                top: 0, left: 0, right: 0, bottom: 0,
                             }}>
-                                <CircularProgress/>
+                                <CircularProgress size={28} />
                             </Box>
                         ) : (
-                            <MessageList 
-                                messages={messages} 
+                            <MessageList
+                                messages={messages}
                                 onMessageClick={handleMessageClick}
                                 isPolling={isPolling}
                                 onTogglePolling={handleTogglePolling}
@@ -348,29 +381,31 @@ export default function Home() {
                         )}
                     </Box>
 
-                    <LogViewer sidebarWidth={sidebarVisible ? SIDEBAR_WIDTH : 0}/>
+                    <LogViewer sidebarWidth={sidebarWidth} />
                 </Box>
             </Box>
 
-            {/* Message Modal */}
-            <MessageModal
-                message={selectedMessage}
-                open={Boolean(selectedMessage)}
-                onClose={handleCloseModal}
-            />
+            <Suspense fallback={null}>
+                {selectedMessage && (
+                    <MessageModal
+                        message={selectedMessage}
+                        open={Boolean(selectedMessage)}
+                        onClose={handleCloseModal}
+                    />
+                )}
+                {isAuthModalOpen && (
+                    <AuthModal
+                        open={isAuthModalOpen}
+                        onClose={handleCloseAuthModal}
+                        onSubmit={handleAuthSubmit}
+                        onError={setError}
+                        activeProfileName={activeProfile}
+                        onProfileSelect={handleProfileSelect}
+                    />
+                )}
+            </Suspense>
 
-            {/* Error notification */}
-            <ErrorNotification error={error} onClose={handleCloseError}/>
-
-            {/* Authentication modal */}
-            <AuthModal
-                open={isAuthModalOpen}
-                onClose={handleCloseAuthModal}
-                onSubmit={handleAuthSubmit}
-                onError={setError}
-                activeProfileName={activeProfile}
-                onProfileSelect={handleProfileSelect}
-            />
+            <ErrorNotification error={error} onClose={handleCloseError} />
         </Box>
     );
 }

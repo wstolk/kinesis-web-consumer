@@ -1,15 +1,14 @@
 // components/AccessKeyForm.js
 import React, {useEffect, useState} from 'react';
-import {TextField, Button, Box, Typography, MenuItem, Collapse, IconButton, Paper} from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { 
-    AWS_REGIONS, 
-    SHARD_ITERATOR_TYPES, 
-    DEFAULT_MESSAGE_LIMIT, 
+import {TextField, Button, Box, Typography, MenuItem, Collapse, ButtonBase} from '@mui/material';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import {
+    SHARD_ITERATOR_TYPES,
+    DEFAULT_MESSAGE_LIMIT,
     DEFAULT_MINUTES_AGO,
-    MAX_MESSAGES_LIMIT 
+    MAX_MESSAGES_LIMIT
 } from '@/lib/constants';
+import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
 const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
     const [streamName, setStreamName] = useState('');
@@ -21,7 +20,7 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
 
     useEffect(() => {
         // Load cached values from localStorage
-        const cachedForm = JSON.parse(localStorage.getItem('kinesisFormData'));
+        const cachedForm = safeGetJSON('kinesisFormData');
         if (cachedForm) {
             setStreamName(cachedForm.streamName || '');
             setMessageLimit(cachedForm.messageLimit || DEFAULT_MESSAGE_LIMIT);
@@ -29,20 +28,20 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
             setPartitionKey(cachedForm.partitionKey || '');
         }
 
-        if (streams.length > 0 && (!cachedForm || !cachedForm.streamName)) {
+        if (streams?.length > 0 && (!cachedForm || !cachedForm.streamName)) {
             setStreamName(streams[0]);
         }
     }, [streams]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Validate message limit for production safety
         const safeMessageLimit = Math.min(Math.max(1, messageLimit), MAX_MESSAGES_LIMIT);
         if (safeMessageLimit !== messageLimit) {
             console.warn(`Message limit capped at ${MAX_MESSAGES_LIMIT} for performance reasons`);
         }
-        
+
         const formData = {
             streamName,
             messageLimit: safeMessageLimit,
@@ -52,30 +51,28 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
         };
 
         // Cache form data in localStorage
-        localStorage.setItem('kinesisFormData', JSON.stringify(formData));
+        safeSetJSON('kinesisFormData', formData);
 
         onSubmit(formData);
     };
 
     return (
         <Box component="form" onSubmit={handleSubmit}>
-            <Typography variant="h6" gutterBottom>
-                AWS Kinesis Configuration
+            <Typography
+                variant="subtitle2"
+                sx={{fontWeight: 700, mb: 1.5}}
+            >
+                Configuration
             </Typography>
-            <Typography variant="body2">
-                Please provide your Kinesis stream details below.
-                This information is required to connect to your AWS Kinesis stream and retrieve messages.
-            </Typography>
-            {/* Display a dropdown if stream list is available, otherwise show a text field */}
-            {streams.length > 0 ? (
+
+            {streams?.length > 0 ? (
                 <TextField
                     fullWidth
-                    margin="normal"
+                    margin="dense"
                     select
-                    label="Kinesis Stream Name"
+                    label="Stream"
                     value={streamName}
                     onChange={(e) => setStreamName(e.target.value)}
-                    helperText="Select the Kinesis stream to connect to"
                 >
                     {streams.map((stream) => (
                         <MenuItem key={stream} value={stream}>
@@ -86,39 +83,59 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
             ) : (
                 <TextField
                     fullWidth
-                    margin="normal"
+                    margin="dense"
                     required
-                    label="Kinesis Stream Name"
+                    label="Stream Name"
                     value={streamName}
                     onChange={(e) => setStreamName(e.target.value)}
-                    helperText="The name of your Kinesis stream"
                 />
             )}
-            <Box sx={{display: 'flex', alignItems: 'center', mt: 2, mb: 1}}>
-                <Typography variant="subtitle1">Advanced Settings</Typography>
-                <IconButton onClick={() => setShowAdvanced(!showAdvanced)} size="small" aria-label={showAdvanced ? 'Hide advanced settings' : 'Show advanced settings'}>
-                    {showAdvanced ? <ExpandLessIcon/> : <ExpandMoreIcon/>}
-                </IconButton>
-            </Box>
+
+            <ButtonBase
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                disableRipple
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.25,
+                    mt: 1.5,
+                    mb: 0.5,
+                    py: 0.25,
+                    color: 'text.secondary',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    transition: 'color 150ms cubic-bezier(0.25, 1, 0.5, 1)',
+                    '&:hover': {
+                        color: 'text.primary',
+                    },
+                }}
+            >
+                <ChevronRightIcon sx={{
+                    fontSize: 16,
+                    transition: 'transform 200ms cubic-bezier(0.25, 1, 0.5, 1)',
+                    transform: showAdvanced ? 'rotate(90deg)' : 'rotate(0deg)',
+                }}/>
+                Advanced
+            </ButtonBase>
+
             <Collapse in={showAdvanced}>
                 <TextField
                     fullWidth
-                    margin="normal"
+                    margin="dense"
                     type="number"
-                    label="Number of Messages to Fetch (optional)"
+                    label="Message Limit"
                     value={messageLimit}
                     onChange={(e) => setMessageLimit(parseInt(e.target.value))}
-                    helperText={`Maximum number of messages to retrieve (max: ${MAX_MESSAGES_LIMIT})`}
-                    inputProps={{ min: 1, max: MAX_MESSAGES_LIMIT }}
+                    helperText={`Max: ${MAX_MESSAGES_LIMIT}`}
+                    inputProps={{min: 1, max: MAX_MESSAGES_LIMIT}}
                 />
                 <TextField
                     fullWidth
-                    margin="normal"
+                    margin="dense"
                     select
                     label="Shard Iterator Type"
                     value={shardIteratorType}
                     onChange={(e) => setShardIteratorType(e.target.value)}
-                    helperText="Select the shard iterator type (default: AT_TIMESTAMP)"
                 >
                     {SHARD_ITERATOR_TYPES.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -129,32 +146,35 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
                 <Collapse in={shardIteratorType === 'AT_TIMESTAMP'}>
                     <TextField
                         fullWidth
-                        margin="normal"
+                        margin="dense"
                         type="number"
-                        label="Number of minutes ago"
+                        label="Minutes Ago"
                         required
                         value={minutesAgo}
                         onChange={(e) => setMinutesAgo(parseInt(e.target.value))}
-                        helperText="Number of minutes ago to start fetching (default: 30)"
                     />
                 </Collapse>
                 <TextField
                     fullWidth
-                    margin="normal"
-                    label="Partition key (optional)"
+                    margin="dense"
+                    label="Partition Key"
                     value={partitionKey}
                     onChange={(e) => setPartitionKey(e.target.value)}
-                    helperText="Specify a partition key or leave empty to retrieve all data"
                 />
             </Collapse>
+
             <Button
                 type="submit"
                 variant="contained"
                 fullWidth
-                sx={{mt: 2}}
+                sx={{
+                    mt: 2,
+                    transition: 'transform 100ms cubic-bezier(0.25, 1, 0.5, 1), background-color 150ms cubic-bezier(0.25, 1, 0.5, 1)',
+                    '&:active': { transform: 'scale(0.98)' },
+                }}
                 disabled={isLoading}
             >
-                {isLoading ? 'Connecting...' : 'Connect to Kinesis'}
+                {isLoading ? 'Fetching...' : 'Fetch'}
             </Button>
         </Box>
     );

@@ -246,6 +246,62 @@ class DataFetchingService {
     }
 
     /**
+     * Start a server-side polling session
+     * @param {string} sessionId - Unique session identifier
+     * @param {Object} params - Connection parameters (credentials, region, stream, endpoint)
+     * @returns {Promise<Object>} Start confirmation
+     */
+    async startPollingSession(sessionId, params) {
+        const response = await fetch('/api/kinesis-poll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start', sessionId, ...params }),
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to start polling session');
+        }
+        return response.json();
+    }
+
+    /**
+     * Poll for new records from a server-side polling session
+     * @param {string} sessionId - Polling session ID
+     * @param {number} messageLimit - Max records per poll
+     * @param {string} partitionKey - Optional partition key filter
+     * @returns {Promise<Object>} Records from poll
+     */
+    async pollRecords(sessionId, messageLimit, partitionKey) {
+        const response = await fetch('/api/kinesis-poll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'poll', sessionId, messageLimit, partitionKey }),
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Poll failed');
+        }
+        return response.json();
+    }
+
+    /**
+     * Stop a server-side polling session
+     * @param {string} sessionId - Polling session ID
+     */
+    async stopPollingSession(sessionId) {
+        try {
+            await fetch('/api/kinesis-poll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'stop', sessionId }),
+            });
+        } catch (e) {
+            // Best effort cleanup
+            loggingService.log('warn', `Failed to stop polling session: ${e.message}`);
+        }
+    }
+
+    /**
      * Get service status for monitoring
      * @returns {Object} Service status
      */
