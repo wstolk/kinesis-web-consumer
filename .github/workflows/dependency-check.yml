@@ -1,0 +1,95 @@
+name: Dependency Check
+
+on:
+  schedule:
+    # Every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        id: audit
+        run: |
+          # Capture full audit output
+          npm audit --production > audit-report.txt 2>&1 || true
+          cat audit-report.txt
+
+          # Check for high/critical vulnerabilities
+          if npm audit --audit-level=high --production > /dev/null 2>&1; then
+            echo "has_vulnerabilities=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_vulnerabilities=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for outdated packages
+        id: outdated
+        run: |
+          npx npm-check-updates > ncu-report.txt 2>&1 || true
+          cat ncu-report.txt
+
+      - name: Create GitHub issue if vulnerabilities found
+        if: steps.audit.outputs.has_vulnerabilities == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const auditReport = fs.readFileSync('audit-report.txt', 'utf8');
+
+            // Check for existing open issue to avoid duplicates
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,dependencies',
+              per_page: 1
+            });
+
+            if (existingIssues.data.length > 0) {
+              // Update existing issue with new report
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssues.data[0].number,
+                body: `## Updated Dependency Audit - ${new Date().toISOString().split('T')[0]}\n\n\`\`\`\n${auditReport.substring(0, 60000)}\n\`\`\``
+              });
+              console.log(`Updated existing issue #${existingIssues.data[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Security: npm audit found vulnerabilities - ${new Date().toISOString().split('T')[0]}`,
+                body: `## Dependency Vulnerability Report\n\nAutomated dependency check found high or critical vulnerabilities in production dependencies.\n\n### Audit Report\n\`\`\`\n${auditReport.substring(0, 60000)}\n\`\`\`\n\n### Next Steps\n- [ ] Review the vulnerabilities listed above\n- [ ] Run \`npm audit fix\` to apply compatible fixes\n- [ ] Manually update packages with breaking changes if needed\n- [ ] Close this issue once resolved`,
+                labels: ['security', 'dependencies']
+              });
+              console.log('Created new security issue');
+            }
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-reports
+          path: |
+            audit-report.txt
+            ncu-report.txt
+          retention-days: 90

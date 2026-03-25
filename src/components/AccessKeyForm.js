@@ -24,15 +24,15 @@ const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
         const cachedForm = JSON.parse(localStorage.getItem('kinesisFormData'));
         if (cachedForm) {
             setStreamName(cachedForm.streamName || '');
-            setMessageLimit(cachedForm.messageLimit || 30);
+            setMessageLimit(cachedForm.messageLimit || DEFAULT_MESSAGE_LIMIT);
             setShardIteratorType(cachedForm.shardIteratorType || 'AT_TIMESTAMP');
             setPartitionKey(cachedForm.partitionKey || '');
         }
 
-        if (streams.length > 0 && !cachedForm.streamName) {
+        if (streams.length > 0 && (!cachedForm || !cachedForm.streamName)) {
             setStreamName(streams[0]);
         }
-    }, []);
+    }, [streams]);
 
     const handleSubmit = (e) => {
         e.preventDefault();

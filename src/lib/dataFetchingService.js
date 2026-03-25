@@ -8,9 +8,8 @@ import { performanceMonitor } from './performanceMonitor';
  */
 class DataFetchingService {
     constructor() {
-        this.activeRequests = new Map(); // Track active requests to prevent duplicates
-        this.requestQueue = []; // Queue for throttling requests
-        this.isProcessingQueue = false;
+        this.activeRequests = new Map(); // Track active request promises to prevent duplicates
+        this.activeAbortControllers = new Map(); // Track AbortControllers for cancellation
         this.lastRequestTime = 0;
         this.minRequestInterval = 1000; // Minimum 1 second between requests
         this.maxConcurrentRequests = 3;
@@ -40,16 +39,18 @@ class DataFetchingService {
         // Create abortable request
         const abortController = new AbortController();
         const requestPromise = this.executeRequest(params, abortController);
-        
-        // Track active request
+
+        // Track active request and its abort controller
         this.activeRequests.set(requestKey, requestPromise);
-        
+        this.activeAbortControllers.set(requestKey, abortController);
+
         try {
             const result = await requestPromise;
             return result;
         } finally {
             // Clean up tracking
             this.activeRequests.delete(requestKey);
+            this.activeAbortControllers.delete(requestKey);
         }
     }
 
@@ -69,9 +70,19 @@ class DataFetchingService {
                 // Throttle requests
                 await this.throttleRequest();
 
+                // Check if the request was cancelled before starting
+                if (abortController.signal.aborted) {
+                    throw new DOMException('Request was cancelled', 'AbortError');
+                }
+
+                // Create a per-attempt AbortController that is linked to the parent
+                const attemptController = new AbortController();
+                const onParentAbort = () => attemptController.abort();
+                abortController.signal.addEventListener('abort', onParentAbort, { once: true });
+
                 // Execute request with timeout
                 const timeoutId = setTimeout(() => {
-                    abortController.abort();
+                    attemptController.abort();
                 }, this.requestTimeout);
 
                 loggingService.log('info', `Executing Kinesis request (attempt ${attempt + 1}/${retryConfig.maxRetries + 1})`);
@@ -82,10 +93,11 @@ class DataFetchingService {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(params),
-                    signal: abortController.signal
+                    signal: attemptController.signal
                 });
 
                 clearTimeout(timeoutId);
+                abortController.signal.removeEventListener('abort', onParentAbort);
 
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -107,7 +119,9 @@ class DataFetchingService {
 
             } catch (error) {
                 lastError = error;
-                
+                clearTimeout(timeoutId);
+                abortController.signal.removeEventListener('abort', onParentAbort);
+
                 // Don't retry on abort or certain errors
                 if (error.name === 'AbortError') {
                     const duration = Date.now() - startTime;
@@ -215,6 +229,14 @@ class DataFetchingService {
      */
     cancelAllRequests() {
         loggingService.log('info', `Cancelling ${this.activeRequests.size} active requests`);
+        this.activeAbortControllers.forEach((controller, key) => {
+            try {
+                controller.abort();
+            } catch (error) {
+                loggingService.log('warn', `Error aborting request ${key}: ${error.message}`);
+            }
+        });
+        this.activeAbortControllers.clear();
         this.activeRequests.clear();
     }
 
@@ -225,7 +247,6 @@ class DataFetchingService {
     getStatus() {
         return {
             activeRequests: this.activeRequests.size,
-            queueSize: this.requestQueue.length,
             lastRequestTime: this.lastRequestTime,
             isHealthy: this.activeRequests.size < this.maxConcurrentRequests
         };

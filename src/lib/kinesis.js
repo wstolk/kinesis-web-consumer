@@ -27,7 +27,7 @@ const MAX_EMPTY_RETRIES = 3;
  */
 export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, region, useDefaultCredentials = false, awsProfile = null) => {
     const clientConfig = { region };
-    
+
     if (useDefaultCredentials) {
         if (awsProfile && awsProfile !== 'default') {
             // Use specific AWS profile
@@ -40,17 +40,15 @@ export const createKinesisClient = (accessKeyId, secretAccessKey, sessionToken, 
         }
     } else {
         // Use manually provided credentials
-        if (!sessionToken || sessionToken === '') {
-            sessionToken = null;
-        }
+        const resolvedSessionToken = (!sessionToken || sessionToken === '') ? null : sessionToken;
         clientConfig.credentials = {
             accessKeyId,
             secretAccessKey,
-            sessionToken
+            sessionToken: resolvedSessionToken
         };
         loggingService.log('info', `Creating Kinesis client for region ${region} using manual credentials`);
     }
-    
+
     return new KinesisClient(clientConfig);
 };
 
@@ -241,8 +239,9 @@ export const getAllShardRecords = async (client, streamName, shardIteratorType, 
     }
 
     loggingService.log('info', `Completed fetching ${totalRecords} total records from Kinesis stream ${streamName}`);
+    const millisValues = allRecords.map(r => r.MillisBehindLatest || 0);
     return {
         records: allRecords,
-        millisBehindLatest: Math.max(...allRecords.map(r => r.MillisBehindLatest || 0)),
+        millisBehindLatest: millisValues.length > 0 ? Math.max(...millisValues) : 0,
     };
 };

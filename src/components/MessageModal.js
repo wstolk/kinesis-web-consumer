@@ -78,4 +78,4 @@ const MessageModal = ({message, open, onClose}) => {
     );
 };
 
-export default MessageModal;
+export default React.memo(MessageModal);

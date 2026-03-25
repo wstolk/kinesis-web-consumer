@@ -1,10 +1,21 @@
 # Security Policy
 
+## Table of Contents
+
+- [Supported Versions](#supported-versions)
+- [Reporting a Vulnerability](#reporting-a-vulnerability)
+- [Security Updates](#security-updates)
+- [Security Scanning](#security-scanning)
+- [Security Best Practices](#security-best-practices)
+- [Security Features](#security-features)
+
+---
+
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+|---|---|
+| 0.1.x | Yes |
 
 ## Security Updates
 
@@ -64,14 +75,14 @@ npm audit --audit-level=high
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in this project, please report it by:
+If you discover a security vulnerability, **do not** open a public GitHub issue.
 
-1. **Do NOT** open a public GitHub issue
-2. Email the maintainer with details:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if available)
+Instead, please use [GitHub Security Advisories](https://github.com/wstolk/kinesis-web-consumer/security/advisories/new) to report it privately, or email the maintainer directly with:
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if available)
 
 We will respond within 48 hours and work with you to address the issue.
 

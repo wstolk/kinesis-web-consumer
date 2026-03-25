@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useCallback} from 'react';
 import {
     Box,
     Typography,
@@ -21,10 +21,58 @@ import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { FixedSizeList } from 'react-window';
 import { POLLING_INTERVALS } from '@/lib/constants';
 
+const MESSAGE_ROW_HEIGHT = 100; // Approximate height of each message Paper element
+
+const MessageRow = React.memo(({ index, style, data }) => {
+    const { messages, onMessageClick, theme } = data;
+    const message = messages[index];
+
+    return (
+        <div style={{ ...style, paddingBottom: 8 }}>
+            <Paper
+                elevation={2}
+                sx={{
+                    p: 2,
+                    cursor: 'pointer',
+                    bgcolor: theme.palette.background.default,
+                    height: MESSAGE_ROW_HEIGHT - 16,
+                    boxSizing: 'border-box',
+                    '&:hover': {
+                        bgcolor: theme.palette.action.hover,
+                    },
+                }}
+                onClick={() => onMessageClick(message)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Message from ${message.timestamp}, partition key ${message.partitionKey}`}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onMessageClick(message);
+                    }
+                }}
+            >
+                <Typography variant="subtitle2">
+                    Timestamp: {message.timestamp}
+                </Typography>
+                <Typography variant="subtitle2">
+                    Partition Key: {message.partitionKey}
+                </Typography>
+                <Typography variant="subtitle2">
+                    Shard ID: {message.ShardId || 'N/A'}
+                </Typography>
+            </Paper>
+        </div>
+    );
+});
+
+MessageRow.displayName = 'MessageRow';
+
 const MessageList = ({
-    messages, 
+    messages,
     onMessageClick,
     isPolling,
     onTogglePolling,
@@ -54,7 +102,7 @@ const MessageList = ({
             });
     }, [messages, partitionKeyFilter, shardIdFilter, sortOrder]);
 
-    const handleDownload = () => {
+    const handleDownload = useCallback(() => {
         const jsonData = {
             messages: sortedAndFilteredMessages.map(message => ({
                 timestamp: message.timestamp,
@@ -76,20 +124,26 @@ const MessageList = ({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    };
+    }, [sortedAndFilteredMessages]);
 
-    const handlePollingMenuClick = (event) => {
+    const handlePollingMenuClick = useCallback((event) => {
         setPollingMenuAnchor(event.currentTarget);
-    };
+    }, []);
 
-    const handlePollingMenuClose = () => {
+    const handlePollingMenuClose = useCallback(() => {
         setPollingMenuAnchor(null);
-    };
+    }, []);
 
-    const handleIntervalChange = (newInterval) => {
+    const handleIntervalChange = useCallback((newInterval) => {
         onUpdatePollingInterval(newInterval);
-        handlePollingMenuClose();
-    };
+        setPollingMenuAnchor(null);
+    }, [onUpdatePollingInterval]);
+
+    const itemData = useMemo(() => ({
+        messages: sortedAndFilteredMessages,
+        onMessageClick,
+        theme,
+    }), [sortedAndFilteredMessages, onMessageClick, theme]);
 
     return (
         <Box>
@@ -122,6 +176,7 @@ const MessageList = ({
                         width: 200,
                         height: 40
                     }}
+                    onSubmit={(e) => e.preventDefault()}
                 >
                     <SearchIcon sx={{p: '4px', color: 'action.active'}}/>
                     <InputBase
@@ -129,6 +184,7 @@ const MessageList = ({
                         placeholder="Filter by Partition Key"
                         value={partitionKeyFilter}
                         onChange={(e) => setPartitionKeyFilter(e.target.value)}
+                        inputProps={{ 'aria-label': 'Filter by Partition Key' }}
                     />
                 </Paper>
 
@@ -141,6 +197,7 @@ const MessageList = ({
                         width: 200,
                         height: 40
                     }}
+                    onSubmit={(e) => e.preventDefault()}
                 >
                     <SearchIcon sx={{p: '4px', color: 'action.active'}}/>
                     <InputBase
@@ -148,11 +205,12 @@ const MessageList = ({
                         placeholder="Filter by Shard ID"
                         value={shardIdFilter}
                         onChange={(e) => setShardIdFilter(e.target.value)}
+                        inputProps={{ 'aria-label': 'Filter by Shard ID' }}
                     />
                 </Paper>
 
                 {/* Sort and Download buttons grouped together */}
-                <ButtonGroup variant="outlined">
+                <ButtonGroup variant="outlined" aria-label="Sort order">
                     <Button
                         onClick={() => setSortOrder('asc')}
                         variant={sortOrder === 'asc' ? 'contained' : 'outlined'}
@@ -173,6 +231,7 @@ const MessageList = ({
                         onClick={handleDownload}
                         disabled={sortedAndFilteredMessages.length === 0}
                         startIcon={<DownloadIcon/>}
+                        aria-label="Download filtered messages as JSON"
                     >
                         Download
                     </Button>
@@ -182,12 +241,13 @@ const MessageList = ({
                 {isAuthenticated && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Tooltip title={isPolling ? 'Stop auto-refresh' : 'Start auto-refresh'}>
-                            <IconButton 
-                                color="primary" 
+                            <IconButton
+                                color="primary"
                                 onClick={onTogglePolling}
                                 size="small"
-                                sx={{ 
-                                    border: 1, 
+                                aria-label={isPolling ? 'Stop auto-refresh' : 'Start auto-refresh'}
+                                sx={{
+                                    border: 1,
                                     borderColor: 'primary.main',
                                     '&:hover': {
                                         backgroundColor: 'primary.main',
@@ -198,10 +258,10 @@ const MessageList = ({
                                 {isPolling ? <PauseIcon /> : <PlayArrowIcon />}
                             </IconButton>
                         </Tooltip>
-                        
+
                         {isPolling && (
                             <>
-                                <Chip 
+                                <Chip
                                     icon={<RefreshIcon />}
                                     label={`${pollInterval / 1000}s`}
                                     size="small"
@@ -209,11 +269,12 @@ const MessageList = ({
                                     variant="outlined"
                                     clickable
                                     onClick={handlePollingMenuClick}
+                                    aria-label={`Polling interval: ${pollInterval / 1000} seconds. Click to change.`}
                                 />
-                                
+
                                 {pollStats && (
                                     <Tooltip title={`${pollStats.successCount}/${pollStats.pollCount} successful polls`}>
-                                        <Chip 
+                                        <Chip
                                             label={`${pollStats.successCount}/${pollStats.pollCount}`}
                                             size="small"
                                             color={pollStats.consecutiveErrors > 0 ? "error" : "success"}
@@ -223,7 +284,7 @@ const MessageList = ({
                                 )}
                             </>
                         )}
-                        
+
                         <Menu
                             anchorEl={pollingMenuAnchor}
                             open={pollingMenuOpen}
@@ -246,34 +307,24 @@ const MessageList = ({
                 )}
             </Box>
 
-            {sortedAndFilteredMessages.map((message, index) => (
-                <Paper
-                    key={index}
-                    elevation={2}
-                    sx={{
-                        mb: 2,
-                        p: 2,
-                        cursor: 'pointer',
-                        bgcolor: theme.palette.background.default,
-                        '&:hover': {
-                            bgcolor: theme.palette.action.hover,
-                        },
-                    }}
-                    onClick={() => onMessageClick(message)}
+            {sortedAndFilteredMessages.length > 0 ? (
+                <FixedSizeList
+                    height={Math.min(sortedAndFilteredMessages.length * MESSAGE_ROW_HEIGHT, 600)}
+                    itemCount={sortedAndFilteredMessages.length}
+                    itemSize={MESSAGE_ROW_HEIGHT}
+                    width="100%"
+                    itemData={itemData}
+                    overscanCount={5}
                 >
-                    <Typography variant="subtitle2">
-                        Timestamp: {message.timestamp}
-                    </Typography>
-                    <Typography variant="subtitle2">
-                        Partition Key: {message.partitionKey}
-                    </Typography>
-                    <Typography variant="subtitle2">
-                        Shard ID: {message.ShardId || 'N/A'}
-                    </Typography>
-                </Paper>
-            ))}
+                    {MessageRow}
+                </FixedSizeList>
+            ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                    No messages to display. Connect to a Kinesis stream to view messages.
+                </Typography>
+            )}
         </Box>
     );
 };
 
-export default MessageList;
+export default React.memo(MessageList);

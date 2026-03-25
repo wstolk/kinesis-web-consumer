@@ -1,5 +1,5 @@
 // components/LogViewer.js
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useMemo, useCallback} from 'react';
 import {
     Box,
     Typography,
@@ -14,6 +14,8 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
+
+const MAX_LOG_ENTRIES = 500;
 
 const LogViewer = ({sidebarWidth}) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -38,7 +40,14 @@ const LogViewer = ({sidebarWidth}) => {
         eventSourceRef.current.onmessage = (event) => {
             try {
                 const newLog = JSON.parse(event.data);
-                setLogs(prevLogs => [...prevLogs, newLog]);
+                setLogs(prevLogs => {
+                    const updated = [...prevLogs, newLog];
+                    // Cap log entries to prevent unbounded memory growth
+                    if (updated.length > MAX_LOG_ENTRIES) {
+                        return updated.slice(-MAX_LOG_ENTRIES);
+                    }
+                    return updated;
+                });
             } catch (error) {
                 console.error('Error parsing log data:', error);
             }
@@ -61,30 +70,30 @@ const LogViewer = ({sidebarWidth}) => {
         }
     }, [logs, isOpen]);
 
-    const formatTimestamp = (timestamp) => {
+    const formatTimestamp = useCallback((timestamp) => {
         try {
             return new Date(timestamp).toLocaleTimeString();
         } catch (error) {
             return timestamp;
         }
-    };
+    }, []);
 
-    const handleClearLogs = () => {
+    const handleClearLogs = useCallback(() => {
         setLogs([{
             timestamp: new Date().toISOString(),
             level: 'info',
             message: 'Logs cleared'
         }]);
-    };
+    }, []);
 
-    const filteredLogs = logs.filter(log => {
+    const filteredLogs = useMemo(() => {
         const searchText = filterText.toLowerCase();
-        return (
+        return logs.filter(log =>
             log.message.toLowerCase().includes(searchText) ||
             log.level.toLowerCase().includes(searchText) ||
             formatTimestamp(log.timestamp).toLowerCase().includes(searchText)
         );
-    });
+    }, [logs, filterText, formatTimestamp]);
 
     return (
         <Box

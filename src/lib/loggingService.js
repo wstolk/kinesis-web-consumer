@@ -1,13 +1,20 @@
 // lib/loggingService.js
-import {EventEmitter} from 'events';
 
 // Declare global instance
 let globalLoggingService;
 
-class LoggingService extends EventEmitter {
+const MAX_LOGGERS = 50;
+
+class LoggingService {
     loggers = new Set();
 
     addLogger(res) {
+        // Prevent unbounded growth of SSE connections
+        if (this.loggers.size >= MAX_LOGGERS) {
+            console.warn(`Max loggers (${MAX_LOGGERS}) reached, rejecting new connection`);
+            return () => {};
+        }
+
         this.loggers.add(res);
 
         // Send a test log immediately to verify connection

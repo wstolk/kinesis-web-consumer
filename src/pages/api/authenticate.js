@@ -1,11 +1,22 @@
 // pages/api/authenticate.js
 import {KinesisClient, ListStreamsCommand} from "@aws-sdk/client-kinesis";
 import { fromIni } from '@aws-sdk/credential-providers';
+import { AWS_REGIONS } from '@/lib/constants';
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
         const {accessKeyId, secretAccessKey, sessionToken, region, endpoint, useDefaultCredentials, awsProfile} = req.body;
 
+        // Input validation
+        if (!region || !AWS_REGIONS.includes(region)) {
+            return res.status(400).json({ authenticated: false, message: 'Invalid or missing region' });
+        }
+
+        if (!useDefaultCredentials && (!accessKeyId || !secretAccessKey)) {
+            return res.status(400).json({ authenticated: false, message: 'accessKeyId and secretAccessKey are required when not using default credentials' });
+        }
+
+        let client;
         try {
             const clientConfig = {
                 region,
@@ -38,7 +49,7 @@ export default async function handler(req, res) {
                 }
             }
 
-            const client = new KinesisClient(clientConfig);
+            client = new KinesisClient(clientConfig);
             const command = new ListStreamsCommand({});
             const response = await client.send(command);
 
@@ -63,6 +74,10 @@ export default async function handler(req, res) {
                     authenticated: false,
                     message: `An unexpected error occurred: ${error.message}`
                 });
+            }
+        } finally {
+            if (client) {
+                client.destroy();
             }
         }
     } else {

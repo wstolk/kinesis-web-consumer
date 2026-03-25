@@ -29,4 +29,4 @@ const Sidebar = ({isVisible, onSubmit, sx, isLoading, streams}) => {
     );
 };
 
-export default Sidebar;
+export default React.memo(Sidebar);
