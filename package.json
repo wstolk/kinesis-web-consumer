@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "audit": "npm audit --production",
+    "lint": "eslint src/",
+    "audit": "npm audit --omit=dev",
     "audit:fix": "npm audit fix"
   },
   "dependencies": {
@@ -18,16 +18,16 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource/roboto": "^5.2.9",
-    "@mui/icons-material": "^6.5.0",
-    "@mui/material": "^6.5.0",
-    "next": "14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "next": "16.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-window": "^2.2.7",
-    "uuid": "^10.0.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35"
+    "eslint": "^9.30.1",
+    "eslint-config-next": "16.2.1"
   }
 }

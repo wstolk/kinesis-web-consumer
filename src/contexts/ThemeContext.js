@@ -11,14 +11,11 @@ const ThemeContext = createContext({
 export const useThemeMode = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
-    const [mode, setMode] = useState('dark');
-
-    useEffect(() => {
+    const [mode, setMode] = useState(() => {
+        if (typeof window === 'undefined') return 'dark';
         const saved = localStorage.getItem('themeMode');
-        if (saved === 'light' || saved === 'dark') {
-            setMode(saved);
-        }
-    }, []);
+        return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    });
 
     const toggleTheme = () => {
         setMode((prev) => {

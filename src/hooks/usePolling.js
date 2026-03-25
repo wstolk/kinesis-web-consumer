@@ -18,23 +18,19 @@ export const usePolling = (pollId = 'default') => {
 
     // Update polling stats periodically
     useEffect(() => {
-        if (isPolling) {
-            statsIntervalRef.current = setInterval(() => {
-                const stats = pollingService.getSessionStats(pollId);
-                setPollStats(stats);
-            }, 5000); // Update stats every 5 seconds
-        } else {
+        if (!isPolling) return;
+
+        statsIntervalRef.current = setInterval(() => {
+            const stats = pollingService.getSessionStats(pollId);
+            setPollStats(stats);
+        }, 5000);
+
+        return () => {
             if (statsIntervalRef.current) {
                 clearInterval(statsIntervalRef.current);
                 statsIntervalRef.current = null;
             }
             setPollStats(null);
-        }
-
-        return () => {
-            if (statsIntervalRef.current) {
-                clearInterval(statsIntervalRef.current);
-            }
         };
     }, [isPolling, pollId]);
 

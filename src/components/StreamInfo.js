@@ -211,10 +211,10 @@ const StreamDetailModal = ({ open, onClose, streamInfo }) => {
     const theme = useTheme();
 
     const filteredShards = useMemo(() => {
-        if (!streamInfo?.shards) return [];
-        if (!shardFilter) return streamInfo.shards;
+        const shards = streamInfo?.shards || [];
+        if (!shardFilter) return shards;
         const q = shardFilter.toLowerCase();
-        return streamInfo.shards.filter(s =>
+        return shards.filter(s =>
             s.shardId.toLowerCase().includes(q) ||
             (s.parentShardId && s.parentShardId.toLowerCase().includes(q))
         );

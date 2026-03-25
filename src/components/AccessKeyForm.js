@@ -1,5 +1,5 @@
 // components/AccessKeyForm.js
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {TextField, Button, Box, Typography, MenuItem, Collapse, ButtonBase} from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
@@ -11,27 +11,19 @@ import {
 import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
 const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
-    const [streamName, setStreamName] = useState('');
+    const cachedForm = safeGetJSON('kinesisFormData');
+    const defaultStream = cachedForm?.streamName || (streams?.length > 0 ? streams[0] : '');
+    const [streamName, setStreamName] = useState(defaultStream);
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [messageLimit, setMessageLimit] = useState(DEFAULT_MESSAGE_LIMIT);
+    const [messageLimit, setMessageLimit] = useState(cachedForm?.messageLimit || DEFAULT_MESSAGE_LIMIT);
     const [minutesAgo, setMinutesAgo] = useState(DEFAULT_MINUTES_AGO);
-    const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
-    const [partitionKey, setPartitionKey] = useState('');
+    const [shardIteratorType, setShardIteratorType] = useState(cachedForm?.shardIteratorType || 'TRIM_HORIZON');
+    const [partitionKey, setPartitionKey] = useState(cachedForm?.partitionKey || '');
 
-    useEffect(() => {
-        // Load cached values from localStorage
-        const cachedForm = safeGetJSON('kinesisFormData');
-        if (cachedForm) {
-            setStreamName(cachedForm.streamName || '');
-            setMessageLimit(cachedForm.messageLimit || DEFAULT_MESSAGE_LIMIT);
-            setShardIteratorType(cachedForm.shardIteratorType || 'AT_TIMESTAMP');
-            setPartitionKey(cachedForm.partitionKey || '');
-        }
-
-        if (streams?.length > 0 && (!cachedForm || !cachedForm.streamName)) {
-            setStreamName(streams[0]);
-        }
-    }, [streams]);
+    // When streams arrive and no stream is selected, pick the first one
+    if (streams?.length > 0 && !streamName) {
+        setStreamName(streams[0]);
+    }
 
     const handleSubmit = (e) => {
         e.preventDefault();
