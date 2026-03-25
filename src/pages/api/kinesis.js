@@ -74,7 +74,18 @@ export default async function handler(req, res) {
         } catch (error) {
             console.error('Error:', error);
             loggingService.log('error', `Failed to fetch Kinesis data: ${error.message}`);
-            res.status(500).json({error: error.message});
+
+            // Return sanitized error messages - avoid leaking internal details
+            const safeErrorMessages = {
+                'ResourceNotFoundException': 'Stream not found. Please verify the stream name and region.',
+                'AccessDeniedException': 'Access denied. Please check your AWS permissions.',
+                'InvalidClientTokenId': 'Invalid credentials. Please verify your AWS access keys.',
+                'SignatureDoesNotMatch': 'Invalid credentials. Please verify your AWS secret key.',
+                'ExpiredTokenException': 'Session token has expired. Please re-authenticate.',
+            };
+            const errorName = error.name || '';
+            const safeMessage = safeErrorMessages[errorName] || 'An error occurred while fetching Kinesis data.';
+            res.status(500).json({error: safeMessage});
         } finally {
             if (client) {
                 client.destroy();

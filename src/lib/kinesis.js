@@ -140,15 +140,32 @@ export const getRecords = async (client, shardIterator, messageLimit, emptyRetri
 
 export const describeStream = async (client, streamName) => {
     loggingService.log('info', `Describing stream: ${streamName}`);
-    return retryableOperation(async () => {
-        const command = new DescribeStreamCommand({
-            StreamName: streamName,
+
+    let allShards = [];
+    let exclusiveStartShardId = undefined;
+    let streamDescription = null;
+
+    do {
+        const result = await retryableOperation(async () => {
+            const command = new DescribeStreamCommand({
+                StreamName: streamName,
+                ...(exclusiveStartShardId && { ExclusiveStartShardId: exclusiveStartShardId }),
+            });
+            return client.send(command);
         });
 
-        const response = await client.send(command);
-        loggingService.log('info', `Stream ${streamName} has ${response.StreamDescription.Shards.length} shards`);
-        return response.StreamDescription;
-    });
+        streamDescription = result.StreamDescription;
+        allShards = allShards.concat(streamDescription.Shards);
+
+        if (streamDescription.HasMoreShards) {
+            exclusiveStartShardId = streamDescription.Shards[streamDescription.Shards.length - 1].ShardId;
+        } else {
+            exclusiveStartShardId = undefined;
+        }
+    } while (exclusiveStartShardId);
+
+    loggingService.log('info', `Stream ${streamName} has ${allShards.length} shards`);
+    return { ...streamDescription, Shards: allShards };
 };
 
 /**

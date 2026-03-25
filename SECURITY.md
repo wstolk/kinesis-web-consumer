@@ -30,7 +30,7 @@
 
 #### Dependency Updates
 - Updated Next.js from 14.2.12 to 14.2.35
-- Updated AWS SDK packages to 3.954.0
+- Updated AWS SDK packages to 3.1016.0
 - Updated Material-UI packages to 6.5.0
 - Updated Emotion packages to latest
 - Removed vulnerable react-code-blocks dependency
@@ -106,6 +106,13 @@ We will respond within 48 hours and work with you to address the issue.
 - Request throttling prevents DoS attacks
 - Circuit breaker pattern for external service failures
 - Memory limits prevent unbounded growth
+- Security headers configured via `next.config.mjs`:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `X-XSS-Protection: 1; mode=block`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Powered-By` header disabled
 
 ### Dependencies
 - Regular security updates via automated scanning
@@ -133,7 +140,7 @@ This project follows:
 
 ## Updates
 
-Last updated: December 17, 2025
+Last updated: March 25, 2026
 
 For the latest security information, check:
 - [npm audit report](https://github.com/wstolk/kinesis-web-consumer/actions)

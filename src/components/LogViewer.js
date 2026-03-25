@@ -135,7 +135,7 @@ const LogViewer = ({sidebarWidth}) => {
                         mr: 2
                     }}
                 >
-                    <IconButton size="small">
+                    <IconButton size="small" aria-label={isOpen ? 'Collapse log viewer' : 'Expand log viewer'}>
                         {isOpen ? <KeyboardArrowDownIcon/> : <KeyboardArrowUpIcon/>}
                     </IconButton>
                     <Typography variant="subtitle2" sx={{fontWeight: 'bold', ml: 1}}>
@@ -149,6 +149,7 @@ const LogViewer = ({sidebarWidth}) => {
                         placeholder="Filter logs..."
                         value={filterText}
                         onChange={(e) => setFilterText(e.target.value)}
+                        inputProps={{ 'aria-label': 'Filter logs' }}
                         sx={{
                             width: '300px',
                             '& .MuiOutlinedInput-root': {
@@ -166,6 +167,7 @@ const LogViewer = ({sidebarWidth}) => {
                                     <IconButton
                                         size="small"
                                         onClick={() => setFilterText('')}
+                                        aria-label="Clear filter"
                                     >
                                         <CloseIcon fontSize="small"/>
                                     </IconButton>
@@ -219,4 +221,4 @@ const LogViewer = ({sidebarWidth}) => {
     );
 };
 
-export default LogViewer;
+export default React.memo(LogViewer);

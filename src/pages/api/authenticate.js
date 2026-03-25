@@ -40,12 +40,21 @@ export default async function handler(req, res) {
                 };
             }
 
-            // Add custom endpoint if provided
+            // Add custom endpoint if provided (validated for SSRF protection)
             if (endpoint) {
-                clientConfig.endpoint = endpoint;
-                // For LocalStack, we typically want to disable SSL
-                if (endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) {
-                    clientConfig.tls = false;
+                try {
+                    const parsedUrl = new URL(endpoint);
+                    const allowedProtocols = ['http:', 'https:'];
+                    if (!allowedProtocols.includes(parsedUrl.protocol)) {
+                        return res.status(400).json({ authenticated: false, message: 'Invalid endpoint protocol. Only http and https are allowed.' });
+                    }
+                    clientConfig.endpoint = endpoint;
+                    // For LocalStack, we typically want to disable SSL
+                    if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+                        clientConfig.tls = false;
+                    }
+                } catch (urlError) {
+                    return res.status(400).json({ authenticated: false, message: 'Invalid endpoint URL format.' });
                 }
             }
 
@@ -70,9 +79,10 @@ export default async function handler(req, res) {
                     message: 'Authentication successful, but insufficient permissions to list streams'
                 });
             } else {
+                console.error('Unexpected authentication error:', error.message);
                 res.status(500).json({
                     authenticated: false,
-                    message: `An unexpected error occurred: ${error.message}`
+                    message: 'An unexpected error occurred during authentication.'
                 });
             }
         } finally {

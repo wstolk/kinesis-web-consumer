@@ -167,7 +167,7 @@ Enter access key, secret key, and optional session token directly in the UI. Cre
 
 ### Polling
 
-Configure polling through the header controls after connecting to a stream:
+Configure polling through the message list controls after connecting to a stream:
 
 | Setting | Range | Default |
 |---|---|---|
@@ -269,4 +269,4 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup inst
 
 ## License
 
-This project is distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project does not currently include a license file. Contact the maintainer for usage terms.

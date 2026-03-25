@@ -66,6 +66,11 @@ class DataFetchingService {
         let lastError;
 
         for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+            // Per-attempt abort controller linked to parent, declared outside try for cleanup
+            let attemptController;
+            let onParentAbort;
+            let timeoutId;
+
             try {
                 // Throttle requests
                 await this.throttleRequest();
@@ -76,12 +81,12 @@ class DataFetchingService {
                 }
 
                 // Create a per-attempt AbortController that is linked to the parent
-                const attemptController = new AbortController();
-                const onParentAbort = () => attemptController.abort();
+                attemptController = new AbortController();
+                onParentAbort = () => attemptController.abort();
                 abortController.signal.addEventListener('abort', onParentAbort, { once: true });
 
                 // Execute request with timeout
-                const timeoutId = setTimeout(() => {
+                timeoutId = setTimeout(() => {
                     attemptController.abort();
                 }, this.requestTimeout);
 
@@ -106,21 +111,21 @@ class DataFetchingService {
 
                 const data = await response.json();
                 const duration = Date.now() - startTime;
-                
+
                 // Record successful request metrics
                 performanceMonitor.recordRequest('kinesis', duration, true, {
                     recordCount: data.records?.length || 0,
                     streamName: params.streamName,
                     attempt: attempt + 1
                 });
-                
+
                 loggingService.log('info', `Successfully fetched ${data.records?.length || 0} records in ${duration}ms`);
                 return data;
 
             } catch (error) {
                 lastError = error;
-                clearTimeout(timeoutId);
-                abortController.signal.removeEventListener('abort', onParentAbort);
+                if (timeoutId) clearTimeout(timeoutId);
+                if (onParentAbort) abortController.signal.removeEventListener('abort', onParentAbort);
 
                 // Don't retry on abort or certain errors
                 if (error.name === 'AbortError') {

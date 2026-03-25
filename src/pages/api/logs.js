@@ -16,6 +16,7 @@ export default function handler(req, res) {
         const removeLogger = loggingService.addLogger(res);
 
         // Keep connection alive with heartbeat
+        let cleanedUp = false;
         const heartbeat = setInterval(() => {
             try {
                 res.write(':heartbeat\n\n');
@@ -26,6 +27,8 @@ export default function handler(req, res) {
         }, 30000);
 
         const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
             clearInterval(heartbeat);
             removeLogger();
             try {

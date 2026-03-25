@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {Box, AppBar, Toolbar, CircularProgress} from '@mui/material';
 import {useTheme} from '@mui/material/styles';
 import MessageList from '@/components/MessageList';
@@ -188,32 +188,32 @@ export default function Home() {
         updateInterval(newInterval);
     };
 
-    const handleMessageClick = (message) => {
+    const handleMessageClick = useCallback((message) => {
         setSelectedMessage(message);
-    };
+    }, []);
 
-    const handleCloseModal = () => {
+    const handleCloseModal = useCallback(() => {
         setSelectedMessage(null);
-    };
+    }, []);
 
-    const handleToggleSidebar = () => {
-        setSidebarVisible(!sidebarVisible);
-    };
+    const handleToggleSidebar = useCallback(() => {
+        setSidebarVisible(prev => !prev);
+    }, []);
 
-    const handleCloseError = (event, reason) => {
+    const handleCloseError = useCallback((event, reason) => {
         if (reason === 'clickaway') {
             return;
         }
         setError(null);
-    };
+    }, []);
 
-    const handleOpenAuthModal = () => {
+    const handleOpenAuthModal = useCallback(() => {
         setIsAuthModalOpen(true);
-    };
+    }, []);
 
-    const handleCloseAuthModal = () => {
+    const handleCloseAuthModal = useCallback(() => {
         setIsAuthModalOpen(false);
-    };
+    }, []);
 
     // Handle authentication form submit and store resulting streams in localStorage
     const handleAuthSubmit = (newCredentials, authResponse) => {
