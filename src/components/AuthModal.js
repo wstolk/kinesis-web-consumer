@@ -15,7 +15,8 @@ import {
     useTheme,
     FormControlLabel,
     Switch,
-    Chip
+    Chip,
+    Avatar
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -24,26 +25,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloudIcon from '@mui/icons-material/Cloud';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
-
-const AWS_REGIONS = [
-    "us-east-1", "us-east-2", "us-west-1", "us-west-2",
-    "af-south-1", "ap-east-1", "ap-south-1", "ap-northeast-1",
-    "ap-northeast-2", "ap-northeast-3", "ap-southeast-1", "ap-southeast-2",
-    "ca-central-1", "eu-central-1", "eu-west-1", "eu-west-2",
-    "eu-west-3", "eu-north-1", "eu-south-1", "me-south-1",
-    "sa-east-1"
-];
-
-const DEFAULT_PROFILE = {
-    name: '',
-    accessKeyId: '',
-    secretAccessKey: '',
-    sessionToken: '',
-    region: 'eu-central-1',
-    endpoint: '',
-    useDefaultCredentials: true, // Default to credential chain
-    awsProfile: 'default', // Default AWS profile
-};
+import {AWS_REGIONS, DEFAULT_PROFILE} from '@/lib/constants';
+import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
 const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfileSelect}) => {
     const theme = useTheme();
@@ -52,13 +35,12 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
     const [formData, setFormData] = useState(DEFAULT_PROFILE);
     const [awsProfiles, setAwsProfiles] = useState([]);
     const [loadingAwsProfiles, setLoadingAwsProfiles] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        // Load profiles from localStorage
-        const savedProfiles = JSON.parse(localStorage.getItem('awsProfiles')) || [];
+        const savedProfiles = safeGetJSON('awsProfiles', []);
         setProfiles(savedProfiles);
 
-        // Load AWS profiles from filesystem when modal opens
         if (open) {
             setEditingProfile(null);
             setFormData(DEFAULT_PROFILE);
@@ -71,20 +53,24 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
         try {
             const response = await fetch('/api/aws-profiles');
             const data = await response.json();
-            
+
             if (response.ok) {
-                setAwsProfiles(data.profiles || []);
-                // Auto-select region from default profile if available
-                const defaultProfile = data.profiles?.find(p => p.profileName === 'default');
-                if (defaultProfile && defaultProfile.region) {
-                    setFormData(prev => ({ ...prev, region: defaultProfile.region }));
+                const profiles = data.profiles || [];
+                setAwsProfiles(profiles);
+                // Auto-select the default profile, or the first available one
+                const defaultProfile = profiles.find(p => p.profileName === 'default');
+                const selectedProfile = defaultProfile || profiles[0];
+                if (selectedProfile) {
+                    setFormData(prev => ({
+                        ...prev,
+                        awsProfile: selectedProfile.profileName,
+                        ...(selectedProfile.region && {region: selectedProfile.region}),
+                    }));
                 }
             } else {
-                console.warn('Failed to load AWS profiles:', data.message);
                 setAwsProfiles([]);
             }
         } catch (error) {
-            console.error('Error loading AWS profiles:', error);
             setAwsProfiles([]);
         } finally {
             setLoadingAwsProfiles(false);
@@ -92,26 +78,24 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
 
+        setIsSubmitting(true);
         try {
             const response = await fetch('/api/authenticate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(formData),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                // Save or update profile
                 const updatedProfiles = editingProfile
                     ? profiles.map(p => p.name === formData.name ? formData : p)
                     : [...profiles, formData];
 
-                localStorage.setItem('awsProfiles', JSON.stringify(updatedProfiles));
+                safeSetJSON('awsProfiles', updatedProfiles);
                 localStorage.setItem('lastUsedProfile', formData.name);
                 setProfiles(updatedProfiles);
                 setEditingProfile(null);
@@ -121,8 +105,9 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                 onError(data.message);
             }
         } catch (error) {
-            console.error(error);
             onError('Failed to authenticate');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -141,7 +126,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
         e.stopPropagation();
         const updatedProfiles = profiles.filter(p => p.name !== profileName);
         setProfiles(updatedProfiles);
-        localStorage.setItem('awsProfiles', JSON.stringify(updatedProfiles));
+        safeSetJSON('awsProfiles', updatedProfiles);
 
         if (editingProfile === profileName) {
             setEditingProfile(null);
@@ -156,146 +141,155 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                width: 1000,
+                width: 780,
                 bgcolor: 'background.paper',
-                boxShadow: 24,
+                border: '1px solid',
+                borderColor: 'surface.border',
                 display: 'flex',
-                height: '90vh',
-                maxHeight: 700,
-                borderRadius: 1
+                height: '80vh',
+                maxHeight: 580,
+                borderRadius: '6px',
+                overflow: 'hidden',
             }}>
                 {/* Close Button */}
                 <IconButton
                     onClick={onClose}
+                    size="small"
+                    aria-label="Close authentication modal"
                     sx={{
                         position: 'absolute',
                         right: 8,
                         top: 8,
                         zIndex: 1,
+                        color: 'text.secondary',
                     }}
                 >
-                    <CloseIcon/>
+                    <CloseIcon fontSize="small" />
                 </IconButton>
 
-                {/* Sidebar */}
+                {/* Left panel — Profile list */}
                 <Box sx={{
-                    width: 500,
-                    borderRight: 1,
-                    borderColor: 'divider',
+                    width: 280,
+                    borderRight: '1px solid',
+                    borderColor: 'surface.border',
                     display: 'flex',
                     flexDirection: 'column',
-                    bgcolor: theme.palette.sidebar.main,
-                    borderTopLeftRadius: 1,
-                    borderBottomLeftRadius: 1,
+                    bgcolor: 'surface.main',
                 }}>
-                    <Box sx={{p: 3}}>
-                        <Typography variant="h6" gutterBottom>
-                            AWS Profiles
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Click a profile to activate it, or use the edit button to modify
+                    <Box sx={{px: 2, py: 1.5}}>
+                        <Typography variant="subtitle1" sx={{fontWeight: 600}}>
+                            Profiles
                         </Typography>
                     </Box>
-                    <Divider/>
-                    <List sx={{flexGrow: 1, overflow: 'auto'}}>
+                    <Divider />
+                    <List sx={{flexGrow: 1, overflow: 'auto', py: 0}}>
                         {profiles.map((profile) => (
                             <ListItem
                                 key={profile.name}
                                 onClick={() => handleProfileClick(profile)}
                                 sx={{
                                     cursor: 'pointer',
-                                    '&:hover': {
-                                        bgcolor: 'action.hover',
-                                    },
+                                    py: 0.75,
+                                    px: 2,
+                                    '&:hover': {bgcolor: 'action.hover'},
                                     ...(profile.name === activeProfileName && {
-                                        borderLeft: 4,
+                                        borderLeft: 3,
                                         borderLeftColor: 'primary.main',
-                                        pl: 1.75,
+                                        pl: 1.625,
                                     }),
                                     ...(profile.name === editingProfile && {
                                         bgcolor: 'action.selected',
                                     })
                                 }}
                             >
+                                <Avatar
+                                    sx={{
+                                        width: 24,
+                                        height: 24,
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        bgcolor: profile.name === activeProfileName ? 'primary.main' : 'surface.light',
+                                        color: profile.name === activeProfileName ? 'primary.contrastText' : 'text.secondary',
+                                        mr: 1,
+                                    }}
+                                >
+                                    {profile.name.charAt(0).toUpperCase()}
+                                </Avatar>
                                 <ListItemText
                                     primary={
-                                        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                                            {profile.name}
+                                        <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5}}>
+                                            <Typography variant="body2" sx={{fontWeight: 500}}>
+                                                {profile.name}
+                                            </Typography>
                                             {profile.name === activeProfileName && (
-                                                <CheckCircleIcon
-                                                    color="primary"
-                                                    sx={{fontSize: 16}}
-                                                />
-                                            )}
-                                            {profile.useDefaultCredentials && (
-                                                <Chip
-                                                    icon={<CloudIcon />}
-                                                    label="Default"
-                                                    size="small"
-                                                    color="primary"
-                                                    variant="outlined"
-                                                />
+                                                <CheckCircleIcon sx={{fontSize: 14, color: 'primary.main'}} />
                                             )}
                                         </Box>
                                     }
                                     secondary={
-                                        profile.useDefaultCredentials 
-                                            ? `AWS Profile: ${profile.awsProfile || 'default'} (${profile.region})`
-                                            : (profile.endpoint ? 'Custom endpoint' : profile.region)
+                                        <Typography variant="caption" sx={{color: 'text.secondary'}}>
+                                            {profile.useDefaultCredentials
+                                                ? `${profile.awsProfile || 'default'} \u00b7 ${profile.region}`
+                                                : (profile.endpoint ? 'Custom endpoint' : profile.region)
+                                            }
+                                        </Typography>
                                     }
                                 />
                                 <ListItemSecondaryAction>
                                     <IconButton
-                                        edge="end"
+                                        size="small"
                                         onClick={(e) => handleEditProfile(e, profile)}
-                                        sx={{mr: 1}}
+                                        aria-label={`Edit profile ${profile.name}`}
+                                        sx={{mr: 0.25, p: 0.5}}
                                     >
-                                        <EditIcon/>
+                                        <EditIcon sx={{fontSize: 15}} />
                                     </IconButton>
                                     <IconButton
-                                        edge="end"
+                                        size="small"
                                         onClick={(e) => handleDeleteProfile(e, profile.name)}
+                                        aria-label={`Delete profile ${profile.name}`}
+                                        sx={{p: 0.5}}
                                     >
-                                        <DeleteIcon/>
+                                        <DeleteIcon sx={{fontSize: 15}} />
                                     </IconButton>
                                 </ListItemSecondaryAction>
                             </ListItem>
                         ))}
                     </List>
                     <Box sx={{
-                        p: 3,
-                        borderTop: 1,
-                        borderColor: 'divider',
-                        bgcolor: theme.palette.sidebar.main,
+                        p: 1.5,
+                        borderTop: '1px solid',
+                        borderColor: 'surface.border',
                     }}>
                         <Button
-                            startIcon={<AddIcon/>}
-                            variant="contained"
+                            startIcon={<AddIcon sx={{fontSize: '16px !important'}} />}
+                            variant={!editingProfile ? 'contained' : 'outlined'}
                             fullWidth
+                            size="small"
                             onClick={() => {
                                 setEditingProfile(null);
                                 setFormData(DEFAULT_PROFILE);
                             }}
-                            color={!editingProfile ? "primary" : "inherit"}
                         >
                             New Profile
                         </Button>
                     </Box>
                 </Box>
 
-                {/* Form */}
+                {/* Right panel — Form */}
                 <Box sx={{
                     flexGrow: 1,
                     display: 'flex',
                     flexDirection: 'column',
-                    height: '100%'
+                    height: '100%',
                 }}>
                     <Box sx={{
-                        p: 3,
+                        px: 2.5,
+                        py: 1.5,
                         flexGrow: 1,
-                        overflow: 'auto'
+                        overflow: 'auto',
                     }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant="subtitle1" sx={{fontWeight: 600, mb: 1.5}}>
                             {editingProfile ? 'Edit Profile' : 'New Profile'}
                         </Typography>
                         <form
@@ -303,27 +297,25 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                 e.preventDefault();
                                 handleSubmit();
                             }}
-                            style={{
-                                height: '100%'
-                            }}>
+                        >
                             <TextField
                                 fullWidth
-                                margin="normal"
+                                margin="dense"
                                 label="Profile Name"
                                 value={formData.name}
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 required
                             />
-                            
-                            <Box sx={{ mt: 2, mb: 2 }}>
+
+                            <Box sx={{mt: 1.5, mb: 1}}>
                                 <FormControlLabel
                                     control={
                                         <Switch
+                                            size="small"
                                             checked={formData.useDefaultCredentials}
                                             onChange={(e) => setFormData({
-                                                ...formData, 
+                                                ...formData,
                                                 useDefaultCredentials: e.target.checked,
-                                                // Clear manual credentials when switching to default
                                                 ...(e.target.checked && {
                                                     accessKeyId: '',
                                                     secretAccessKey: '',
@@ -333,38 +325,33 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                         />
                                     }
                                     label={
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            {formData.useDefaultCredentials ? <CloudIcon /> : <VpnKeyIcon />}
-                                            {formData.useDefaultCredentials ? 'Use AWS Profile (Recommended)' : 'Use Manual Credentials'}
+                                        <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5}}>
+                                            {formData.useDefaultCredentials ? <CloudIcon sx={{fontSize: 16}} /> : <VpnKeyIcon sx={{fontSize: 16}} />}
+                                            <Typography variant="body2">
+                                                {formData.useDefaultCredentials ? 'AWS Profile' : 'Manual Credentials'}
+                                            </Typography>
                                         </Box>
                                     }
                                 />
-                                <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mt: 0.5 }}>
-                                    {formData.useDefaultCredentials 
-                                        ? 'Use AWS profiles from ~/.aws/credentials and ~/.aws/config'
-                                        : 'Manually specify AWS access keys and secrets'
-                                    }
-                                </Typography>
                             </Box>
 
                             {formData.useDefaultCredentials && (
                                 <TextField
                                     fullWidth
-                                    margin="normal"
+                                    margin="dense"
                                     select
                                     label="AWS Profile"
                                     value={formData.awsProfile}
                                     onChange={(e) => {
                                         const selectedProfile = awsProfiles.find(p => p.profileName === e.target.value);
                                         setFormData({
-                                            ...formData, 
+                                            ...formData,
                                             awsProfile: e.target.value,
-                                            // Auto-update region from profile if available
-                                            ...(selectedProfile?.region && { region: selectedProfile.region })
+                                            ...(selectedProfile?.region && {region: selectedProfile.region})
                                         });
                                     }}
                                     disabled={loadingAwsProfiles}
-                                    helperText={loadingAwsProfiles ? "Loading AWS profiles..." : `${awsProfiles.length} profiles found in ~/.aws/`}
+                                    helperText={loadingAwsProfiles ? 'Loading...' : `${awsProfiles.length} profiles found`}
                                 >
                                     {awsProfiles.map((profile) => (
                                         <MenuItem key={profile.profileName} value={profile.profileName}>
@@ -383,7 +370,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                 <>
                                     <TextField
                                         fullWidth
-                                        margin="normal"
+                                        margin="dense"
                                         label="Access Key ID"
                                         value={formData.accessKeyId}
                                         onChange={(e) => setFormData({...formData, accessKeyId: e.target.value})}
@@ -391,7 +378,7 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                     />
                                     <TextField
                                         fullWidth
-                                        margin="normal"
+                                        margin="dense"
                                         label="Secret Access Key"
                                         type="password"
                                         value={formData.secretAccessKey}
@@ -400,19 +387,18 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                                     />
                                     <TextField
                                         fullWidth
-                                        margin="normal"
-                                        label="Session Token (optional)"
+                                        margin="dense"
+                                        label="Session Token"
                                         value={formData.sessionToken}
                                         onChange={(e) => setFormData({...formData, sessionToken: e.target.value})}
-                                        helperText="Your AWS session token (if applicable)"
                                     />
                                 </>
                             )}
                             <TextField
                                 fullWidth
-                                margin="normal"
+                                margin="dense"
                                 select
-                                label="AWS Region"
+                                label="Region"
                                 value={formData.region}
                                 onChange={(e) => setFormData({...formData, region: e.target.value})}
                                 required
@@ -425,34 +411,29 @@ const AuthModal = ({open, onClose, onSubmit, onError, activeProfileName, onProfi
                             </TextField>
                             <TextField
                                 fullWidth
-                                margin="normal"
-                                label="Custom Endpoint URL (optional)"
+                                margin="dense"
+                                label="Custom Endpoint"
                                 value={formData.endpoint}
                                 onChange={(e) => setFormData({...formData, endpoint: e.target.value})}
-                                helperText="e.g., http://localhost:4566 for LocalStack"
+                                placeholder="e.g., http://localhost:4566"
                             />
                         </form>
                     </Box>
-                    {/* Fixed button container */}
+                    {/* Fixed button area */}
                     <Box sx={{
-                        p: 3,
-                        borderTop: 1,
-                        borderColor: 'divider',
+                        px: 2.5,
+                        py: 1.5,
+                        borderTop: '1px solid',
+                        borderColor: 'surface.border',
                         display: 'flex',
                         justifyContent: 'flex-end',
-                        bgcolor: 'background.paper',
+                        gap: 1,
                     }}>
-                        <Button
-                            onClick={onClose}
-                            sx={{mr: 2}}
-                        >
+                        <Button onClick={onClose} size="small">
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            variant="contained"
-                        >
-                            {editingProfile ? 'Update Profile' : 'Create Profile'}
+                        <Button onClick={handleSubmit} variant="contained" size="small" disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : (editingProfile ? 'Update' : 'Create')}
                         </Button>
                     </Box>
                 </Box>

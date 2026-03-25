@@ -1,13 +1,20 @@
 // lib/loggingService.js
-import {EventEmitter} from 'events';
 
 // Declare global instance
 let globalLoggingService;
 
-class LoggingService extends EventEmitter {
+const MAX_LOGGERS = 50;
+
+class LoggingService {
     loggers = new Set();
 
     addLogger(res) {
+        // Prevent unbounded growth of SSE connections
+        if (this.loggers.size >= MAX_LOGGERS) {
+            console.warn(`Max loggers (${MAX_LOGGERS}) reached, rejecting new connection`);
+            return () => {};
+        }
+
         this.loggers.add(res);
 
         // Send a test log immediately to verify connection
@@ -19,10 +26,17 @@ class LoggingService extends EventEmitter {
     }
 
     log(level, message) {
+        // Sanitize log message to prevent log injection
+        const validLevels = ['debug', 'info', 'warn', 'error'];
+        const sanitizedLevel = validLevels.includes(level) ? level : 'info';
+        const sanitizedMessage = typeof message === 'string'
+            ? message.replace(/[\r\n]/g, ' ').slice(0, 2000)
+            : String(message).replace(/[\r\n]/g, ' ').slice(0, 2000);
+
         const logEntry = {
             timestamp: new Date().toISOString(),
-            level,
-            message
+            level: sanitizedLevel,
+            message: sanitizedMessage
         };
 
         this.loggers.forEach(res => {

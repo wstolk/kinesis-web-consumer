@@ -23,7 +23,6 @@ export default async function handler(req, res) {
             console.error('Error listing AWS profiles:', error);
             res.status(500).json({
                 error: 'Failed to discover AWS profiles',
-                message: error.message,
                 profiles: []
             });
         }

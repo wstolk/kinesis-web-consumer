@@ -1,11 +1,27 @@
 // pages/api/authenticate.js
 import {KinesisClient, ListStreamsCommand} from "@aws-sdk/client-kinesis";
 import { fromIni } from '@aws-sdk/credential-providers';
+import { AWS_REGIONS } from '@/lib/constants';
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
         const {accessKeyId, secretAccessKey, sessionToken, region, endpoint, useDefaultCredentials, awsProfile} = req.body;
 
+        // Input validation
+        if (!region || !AWS_REGIONS.includes(region)) {
+            return res.status(400).json({ authenticated: false, message: 'Invalid or missing region' });
+        }
+
+        if (!useDefaultCredentials && (!accessKeyId || !secretAccessKey)) {
+            return res.status(400).json({ authenticated: false, message: 'accessKeyId and secretAccessKey are required when not using default credentials' });
+        }
+
+        // Validate awsProfile to prevent injection into filesystem operations
+        if (awsProfile && (typeof awsProfile !== 'string' || !/^[a-zA-Z0-9_\-./]+$/.test(awsProfile))) {
+            return res.status(400).json({ authenticated: false, message: 'Invalid AWS profile name.' });
+        }
+
+        let client;
         try {
             const clientConfig = {
                 region,
@@ -29,16 +45,25 @@ export default async function handler(req, res) {
                 };
             }
 
-            // Add custom endpoint if provided
+            // Add custom endpoint if provided (validated for SSRF protection)
             if (endpoint) {
-                clientConfig.endpoint = endpoint;
-                // For LocalStack, we typically want to disable SSL
-                if (endpoint.includes('localhost') || endpoint.includes('127.0.0.1')) {
-                    clientConfig.tls = false;
+                try {
+                    const parsedUrl = new URL(endpoint);
+                    const allowedProtocols = ['http:', 'https:'];
+                    if (!allowedProtocols.includes(parsedUrl.protocol)) {
+                        return res.status(400).json({ authenticated: false, message: 'Invalid endpoint protocol. Only http and https are allowed.' });
+                    }
+                    clientConfig.endpoint = endpoint;
+                    // For LocalStack, we typically want to disable SSL
+                    if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+                        clientConfig.tls = false;
+                    }
+                } catch (urlError) {
+                    return res.status(400).json({ authenticated: false, message: 'Invalid endpoint URL format.' });
                 }
             }
 
-            const client = new KinesisClient(clientConfig);
+            client = new KinesisClient(clientConfig);
             const command = new ListStreamsCommand({});
             const response = await client.send(command);
 
@@ -59,10 +84,15 @@ export default async function handler(req, res) {
                     message: 'Authentication successful, but insufficient permissions to list streams'
                 });
             } else {
+                console.error('Unexpected authentication error:', error.message);
                 res.status(500).json({
                     authenticated: false,
-                    message: `An unexpected error occurred: ${error.message}`
+                    message: 'An unexpected error occurred during authentication.'
                 });
+            }
+        } finally {
+            if (client) {
+                client.destroy();
             }
         }
     } else {

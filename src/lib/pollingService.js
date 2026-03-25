@@ -29,7 +29,7 @@ class PollingService {
      * @param {number} interval - Polling interval in milliseconds
      * @returns {boolean} True if polling started successfully
      */
-    startPolling(pollId, params, onData, onError, interval = this.pollConfig.defaultInterval) {
+    startPolling(pollId, params, onData, onError, interval = this.pollConfig.defaultInterval, fetchFn = null) {
         // Validate interval
         if (interval < this.pollConfig.minInterval || interval > this.pollConfig.maxInterval) {
             const error = `Invalid polling interval: ${interval}ms. Must be between ${this.pollConfig.minInterval}ms and ${this.pollConfig.maxInterval}ms`;
@@ -48,6 +48,7 @@ class PollingService {
             params,
             onData,
             onError,
+            fetchFn,
             interval,
             startTime: Date.now(),
             lastPollTime: 0,
@@ -165,8 +166,10 @@ class PollingService {
 
         try {
             loggingService.log('debug', `Executing poll ${pollState.pollCount} for ${pollState.id}`);
-            
-            const data = await dataFetchingService.fetchKinesisData(pollState.params);
+
+            const data = pollState.fetchFn
+                ? await pollState.fetchFn(pollState.params)
+                : await dataFetchingService.fetchKinesisData(pollState.params);
             
             // Success - reset error tracking
             pollState.successCount++;

@@ -173,6 +173,10 @@ class PerformanceMonitor {
      */
     addTelemetryHook(hook) {
         if (typeof hook === 'function') {
+            if (this.telemetryHooks.length >= 20) {
+                this.log('warn', 'Maximum telemetry hooks (20) reached, rejecting new hook');
+                return;
+            }
             this.telemetryHooks.push(hook);
             this.log('info', 'Added telemetry hook for external monitoring');
         }

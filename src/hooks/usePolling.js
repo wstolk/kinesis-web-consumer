@@ -18,23 +18,19 @@ export const usePolling = (pollId = 'default') => {
 
     // Update polling stats periodically
     useEffect(() => {
-        if (isPolling) {
-            statsIntervalRef.current = setInterval(() => {
-                const stats = pollingService.getSessionStats(pollId);
-                setPollStats(stats);
-            }, 5000); // Update stats every 5 seconds
-        } else {
+        if (!isPolling) return;
+
+        statsIntervalRef.current = setInterval(() => {
+            const stats = pollingService.getSessionStats(pollId);
+            setPollStats(stats);
+        }, 5000);
+
+        return () => {
             if (statsIntervalRef.current) {
                 clearInterval(statsIntervalRef.current);
                 statsIntervalRef.current = null;
             }
             setPollStats(null);
-        }
-
-        return () => {
-            if (statsIntervalRef.current) {
-                clearInterval(statsIntervalRef.current);
-            }
         };
     }, [isPolling, pollId]);
 
@@ -55,7 +51,7 @@ export const usePolling = (pollId = 'default') => {
      * @param {Function} onError - Error callback
      * @param {number} interval - Polling interval (optional)
      */
-    const startPolling = useCallback((params, onData, onError, interval = pollInterval) => {
+    const startPolling = useCallback((params, onData, onError, interval = pollInterval, fetchFn = null) => {
         const wrappedOnError = (error) => {
             setLastError(error);
             if (onError) {
@@ -68,7 +64,8 @@ export const usePolling = (pollId = 'default') => {
             params,
             onData,
             wrappedOnError,
-            interval
+            interval,
+            fetchFn
         );
 
         if (success) {
@@ -112,7 +109,7 @@ export const usePolling = (pollId = 'default') => {
      * @param {Function} onData - Success callback (required when starting)
      * @param {Function} onError - Error callback (optional)
      */
-    const togglePolling = useCallback((params, onData, onError) => {
+    const togglePolling = useCallback((params, onData, onError, fetchFn = null) => {
         if (isPolling) {
             return stopPolling();
         } else {
@@ -120,9 +117,9 @@ export const usePolling = (pollId = 'default') => {
                 loggingService.log('error', 'Cannot start polling: missing required parameters');
                 return false;
             }
-            return startPolling(params, onData, onError);
+            return startPolling(params, onData, onError, pollInterval, fetchFn);
         }
-    }, [isPolling, startPolling, stopPolling]);
+    }, [isPolling, startPolling, stopPolling, pollInterval]);
 
     /**
      * Check if polling is currently active

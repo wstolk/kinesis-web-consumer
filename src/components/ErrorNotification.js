@@ -17,4 +17,4 @@ const ErrorNotification = ({ error, onClose }) => {
     );
 };
 
-export default ErrorNotification;
+export default React.memo(ErrorNotification);

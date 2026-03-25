@@ -611,3 +611,33 @@ This is a well-structured Next.js application with production-ready patterns for
 5. **Developer experience**: Path aliases, logging service, mock mode, hot reload
 
 When working on this codebase, prioritize simplicity, follow existing patterns, and leverage the service layer for business logic. Always test locally with Docker to ensure the standalone build works correctly.
+
+---
+
+## Design Context
+
+### Users
+Mixed technical team — DevOps, backend developers, and other technical roles who need visibility into Kinesis stream data. They use this tool for debugging, monitoring, and inspecting stream contents. Sessions can be long (monitoring) or short (quick data lookup). Users expect efficiency and clarity over polish.
+
+### Brand Personality
+**Professional, trustworthy, clear.** A calm, no-nonsense tool that instills confidence. It should feel like reliable infrastructure tooling — not flashy, but undeniably well-made. Three words: **dependable, clean, precise.**
+
+### Aesthetic Direction
+- **Visual tone:** Data-dense observability tool. Information-first, with strong scannability and clear visual hierarchy. Inspired by Datadog and Grafana — optimized for reading and scanning structured data, not for marketing.
+- **Theme:** Both light and dark mode with a toggle. Dark mode is the natural fit for long monitoring sessions; light mode for quick lookups or bright environments.
+- **Color palette:** Functional color usage — blues for primary actions, semantic colors for status (green/success, amber/warning, red/error). Avoid decorative color. Current MUI blue (#1976d2) is fine as a foundation.
+- **Typography:** Roboto (already in use). Monospace for data values, partition keys, timestamps, and JSON content. Clear size hierarchy between headings, labels, and data.
+- **Spacing:** Compact but not cramped. Data density is important — users want to see many messages at once without excessive whitespace.
+- **Anti-references:** Avoid anything that looks like a marketing site, consumer app, or overly playful SaaS product. No rounded bubbly cards, no gradient hero sections, no decorative illustrations.
+
+### Design Principles
+
+1. **Content density over decoration** — Every pixel should serve the data. Minimize chrome, maximize the information on screen. Padding and spacing should be tight and intentional.
+
+2. **Scannability first** — Users scan streams of messages quickly. Use consistent alignment, monospace for data, clear visual grouping, and subtle alternating row treatments to aid rapid scanning.
+
+3. **Quiet confidence** — The interface should feel solid and professional without drawing attention to itself. Subtle transitions, muted colors, restrained use of elevation and borders. No bouncing, no flash.
+
+4. **Functional color only** — Color communicates meaning (status, actions, errors), never decoration. Maintain high contrast ratios for accessibility, especially in dark mode.
+
+5. **Respect the workflow** — Don't interrupt. Modals only when necessary. Inline editing and feedback where possible. The tool should stay out of the way and let users focus on the data.

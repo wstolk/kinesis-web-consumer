@@ -1,10 +1,21 @@
 # Security Policy
 
+## Table of Contents
+
+- [Supported Versions](#supported-versions)
+- [Reporting a Vulnerability](#reporting-a-vulnerability)
+- [Security Updates](#security-updates)
+- [Security Scanning](#security-scanning)
+- [Security Best Practices](#security-best-practices)
+- [Security Features](#security-features)
+
+---
+
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+|---|---|
+| 0.1.x | Yes |
 
 ## Security Updates
 
@@ -19,7 +30,7 @@
 
 #### Dependency Updates
 - Updated Next.js from 14.2.12 to 14.2.35
-- Updated AWS SDK packages to 3.954.0
+- Updated AWS SDK packages to 3.1016.0
 - Updated Material-UI packages to 6.5.0
 - Updated Emotion packages to latest
 - Removed vulnerable react-code-blocks dependency
@@ -64,14 +75,14 @@ npm audit --audit-level=high
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in this project, please report it by:
+If you discover a security vulnerability, **do not** open a public GitHub issue.
 
-1. **Do NOT** open a public GitHub issue
-2. Email the maintainer with details:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if available)
+Instead, please use [GitHub Security Advisories](https://github.com/wstolk/kinesis-web-consumer/security/advisories/new) to report it privately, or email the maintainer directly with:
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if available)
 
 We will respond within 48 hours and work with you to address the issue.
 
@@ -88,6 +99,8 @@ We will respond within 48 hours and work with you to address the issue.
 - Multi-stage builds minimize attack surface
 - Standalone Next.js output reduces dependencies
 - Images are signed with cosign for verification
+- `tini` init system for proper PID 1 signal handling
+- Built-in healthcheck endpoint (`curl -f http://localhost:3000/`)
 
 ### Runtime Security
 - Server-side AWS operations prevent credential exposure
@@ -95,6 +108,13 @@ We will respond within 48 hours and work with you to address the issue.
 - Request throttling prevents DoS attacks
 - Circuit breaker pattern for external service failures
 - Memory limits prevent unbounded growth
+- Security headers configured via `next.config.mjs`:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `X-XSS-Protection: 1; mode=block`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Powered-By` header disabled
 
 ### Dependencies
 - Regular security updates via automated scanning
@@ -122,7 +142,7 @@ This project follows:
 
 ## Updates
 
-Last updated: December 17, 2025
+Last updated: March 25, 2026
 
 For the latest security information, check:
 - [npm audit report](https://github.com/wstolk/kinesis-web-consumer/actions)
