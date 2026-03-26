@@ -33,6 +33,7 @@ export default function Home() {
     const [lastFetchParams, setLastFetchParams] = useState(null);
     const [pollSessionId, setPollSessionId] = useState(null);
     const [streamInfo, setStreamInfo] = useState(null);
+    const [batchHistory, setBatchHistory] = useState([]);
     const {useRealKinesis} = useKinesisMode();
     const theme = useTheme();
 
@@ -92,6 +93,14 @@ export default function Home() {
         };
     }, [stopPolling]);
 
+    const MAX_BATCH_HISTORY = 60;
+    const recordBatch = useCallback((count) => {
+        setBatchHistory(prev => {
+            const next = [...prev, { count, time: Date.now() }];
+            return next.length > MAX_BATCH_HISTORY ? next.slice(-MAX_BATCH_HISTORY) : next;
+        });
+    }, []);
+
     // Fetch Kinesis data on form submit
     const handleSubmit = async (form) => {
         if (!form) {
@@ -123,6 +132,7 @@ export default function Home() {
             }));
 
             setMessages(formattedMessages);
+            recordBatch(formattedMessages.length);
             if (data.streamInfo) {
                 setStreamInfo(data.streamInfo);
             }
@@ -139,7 +149,8 @@ export default function Home() {
     };
 
     // Handle polling data updates with memory management
-    const handlePollingData = (data) => {
+    const handlePollingData = useCallback((data) => {
+        recordBatch(data.records.length);
         const newMessages = data.records.map(record => ({
             ...record,
             timestamp: new Date(record.ApproximateArrivalTimestamp).toLocaleString('en-US', {timeZone: 'Europe/Amsterdam'}),
@@ -174,7 +185,7 @@ export default function Home() {
 
             return limitedMessages;
         });
-    };
+    }, [recordBatch]);
 
     const handlePollingError = (error) => {
         loggingService.log('warn', `Polling error: ${error.message}`);
@@ -377,6 +388,7 @@ export default function Home() {
                                 onUpdatePollingInterval={handleUpdatePollingInterval}
                                 pollStats={pollStats}
                                 isAuthenticated={isAuthenticated}
+                                batchHistory={batchHistory}
                             />
                         )}
                     </Box>

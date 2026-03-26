@@ -22,6 +22,59 @@ import ViewAgendaOutlinedIcon from '@mui/icons-material/ViewAgendaOutlined';
 import { List as VirtualList } from 'react-window';
 import { POLLING_INTERVALS } from '@/lib/constants';
 
+const CHART_HEIGHT = 48;
+
+const BatchChart = React.memo(({ batches, theme }) => {
+    if (!batches || batches.length === 0) return null;
+
+    const maxCount = Math.max(...batches.map(b => b.count), 1);
+
+    return (
+        <Box
+            sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                height: CHART_HEIGHT,
+                gap: '1px',
+                mb: 0.75,
+                px: 0.5,
+                bgcolor: 'surface.main',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: 'surface.border',
+                overflow: 'hidden',
+            }}
+        >
+            {batches.map((batch, i) => {
+                const height = Math.max(2, (batch.count / maxCount) * (CHART_HEIGHT - 8));
+                const isLatest = i === batches.length - 1;
+                return (
+                    <Tooltip
+                        key={batch.time}
+                        title={`${batch.count} records`}
+                        placement="top"
+                        arrow
+                    >
+                        <Box
+                            sx={{
+                                flex: 1,
+                                minWidth: 3,
+                                maxWidth: 12,
+                                height,
+                                bgcolor: isLatest ? 'primary.main' : alpha(theme.palette.primary.main, 0.4),
+                                borderRadius: '2px 2px 0 0',
+                                transition: 'height 200ms ease-out',
+                            }}
+                        />
+                    </Tooltip>
+                );
+            })}
+        </Box>
+    );
+});
+
+BatchChart.displayName = 'BatchChart';
+
 const TABLE_ROW_HEIGHT = 44;
 const CARD_ROW_HEIGHT = 80;
 const TABLE_HEADER_HEIGHT = 36;
@@ -246,7 +299,8 @@ const MessageList = ({
     pollInterval,
     onUpdatePollingInterval,
     pollStats,
-    isAuthenticated
+    isAuthenticated,
+    batchHistory,
 }) => {
     const [partitionKeyFilter, setPartitionKeyFilter] = useState('');
     const [shardIdFilter, setShardIdFilter] = useState('');
@@ -544,6 +598,11 @@ const MessageList = ({
                     )}
                 </Box>
             </Box>
+
+            {/* Batch volume chart */}
+            {batchHistory && batchHistory.length > 0 && (
+                <BatchChart batches={batchHistory} theme={theme} />
+            )}
 
             {/* Message List */}
             {sortedAndFilteredMessages.length > 0 ? (
