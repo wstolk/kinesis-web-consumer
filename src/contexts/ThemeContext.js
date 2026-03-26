@@ -11,11 +11,16 @@ const ThemeContext = createContext({
 export const useThemeMode = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
-    const [mode, setMode] = useState(() => {
-        if (typeof window === 'undefined') return 'dark';
+    const [mode, setMode] = useState('dark');
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
         const saved = localStorage.getItem('themeMode');
-        return (saved === 'light' || saved === 'dark') ? saved : 'dark';
-    });
+        if (saved === 'light' || saved === 'dark') {
+            setMode(saved);
+        }
+        setMounted(true);
+    }, []);
 
     const toggleTheme = () => {
         setMode((prev) => {
@@ -27,7 +32,7 @@ export const ThemeProvider = ({ children }) => {
 
     const theme = useMemo(() => createAppTheme(mode), [mode]);
 
-    const contextValue = useMemo(() => ({ mode, toggleTheme }), [mode]);
+    const contextValue = useMemo(() => ({ mode, toggleTheme, mounted }), [mode, mounted]);
 
     return (
         <ThemeContext.Provider value={contextValue}>

@@ -108,8 +108,17 @@ export default function Home() {
             return;
         }
 
+        // Stop any active polling session
+        stopPolling();
+        if (pollSessionId) {
+            dataFetchingService.stopPollingSession(pollSessionId);
+            setPollSessionId(null);
+        }
+
         setIsLoading(true);
         setError(null);
+        setMessages([]);
+        setBatchHistory([]);
 
         const requestParams = {
             ...credentials,

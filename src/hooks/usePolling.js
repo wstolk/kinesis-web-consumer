@@ -11,10 +11,16 @@ import { loggingService } from '@/lib/loggingService';
  */
 export const usePolling = (pollId = 'default') => {
     const [isPolling, setIsPolling] = useState(false);
-    const [pollInterval, setPollInterval] = useState(DEFAULT_POLLING_INTERVAL);
+    const [pollInterval, _setPollInterval] = useState(DEFAULT_POLLING_INTERVAL);
+    const pollIntervalRef = useRef(pollInterval);
     const [pollStats, setPollStats] = useState(null);
     const [lastError, setLastError] = useState(null);
     const statsIntervalRef = useRef(null);
+
+    const setPollInterval = useCallback((val) => {
+        pollIntervalRef.current = val;
+        _setPollInterval(val);
+    }, []);
 
     // Update polling stats periodically
     useEffect(() => {
@@ -51,7 +57,8 @@ export const usePolling = (pollId = 'default') => {
      * @param {Function} onError - Error callback
      * @param {number} interval - Polling interval (optional)
      */
-    const startPolling = useCallback((params, onData, onError, interval = pollInterval, fetchFn = null) => {
+    const startPolling = useCallback((params, onData, onError, interval, fetchFn = null) => {
+        const effectiveInterval = interval ?? pollIntervalRef.current;
         const wrappedOnError = (error) => {
             setLastError(error);
             if (onError) {
@@ -64,18 +71,18 @@ export const usePolling = (pollId = 'default') => {
             params,
             onData,
             wrappedOnError,
-            interval,
+            effectiveInterval,
             fetchFn
         );
 
         if (success) {
             setIsPolling(true);
             setLastError(null);
-            loggingService.log('info', `Started polling with ${interval}ms interval`);
+            loggingService.log('info', `Started polling with ${effectiveInterval}ms interval`);
         }
 
         return success;
-    }, [pollId, pollInterval]);
+    }, [pollId]);
 
     /**
      * Stop polling
@@ -95,12 +102,11 @@ export const usePolling = (pollId = 'default') => {
      * @param {number} newInterval - New interval in milliseconds
      */
     const updateInterval = useCallback((newInterval) => {
-        const updated = pollingService.updateInterval(pollId, newInterval);
-        if (updated) {
-            setPollInterval(newInterval);
-            loggingService.log('info', `Updated polling interval to ${newInterval}ms`);
-        }
-        return updated;
+        // Always update local state so the next startPolling uses the new interval
+        setPollInterval(newInterval);
+        // If actively polling, also update the service's scheduled timer
+        pollingService.updateInterval(pollId, newInterval);
+        loggingService.log('info', `Updated polling interval to ${newInterval}ms`);
     }, [pollId]);
 
     /**
@@ -117,9 +123,9 @@ export const usePolling = (pollId = 'default') => {
                 loggingService.log('error', 'Cannot start polling: missing required parameters');
                 return false;
             }
-            return startPolling(params, onData, onError, pollInterval, fetchFn);
+            return startPolling(params, onData, onError, undefined, fetchFn);
         }
-    }, [isPolling, startPolling, stopPolling, pollInterval]);
+    }, [isPolling, startPolling, stopPolling]);
 
     /**
      * Check if polling is currently active

@@ -133,8 +133,15 @@ class PollingService {
 
         pollState.interval = newInterval;
         pollState.currentInterval = newInterval;
+
+        // Reschedule the pending poll with the new interval
+        if (pollState.timeoutId) {
+            clearTimeout(pollState.timeoutId);
+            this.schedulePoll(pollState);
+        }
+
         loggingService.log('info', `Updated polling interval for ${pollId} to ${newInterval}ms`);
-        
+
         return true;
     }
 
