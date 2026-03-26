@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useSyncExternalStore } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { createAppTheme } from '@/lib/theme';
@@ -10,12 +10,16 @@ const ThemeContext = createContext({
 
 export const useThemeMode = () => useContext(ThemeContext);
 
+const subscribeFn = () => () => {};
+const getSnapshot = () => {
+    const saved = localStorage.getItem('themeMode');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+};
+const getServerSnapshot = () => 'dark';
+
 export const ThemeProvider = ({ children }) => {
-    const [mode, setMode] = useState(() => {
-        if (typeof window === 'undefined') return 'dark';
-        const saved = localStorage.getItem('themeMode');
-        return (saved === 'light' || saved === 'dark') ? saved : 'dark';
-    });
+    const storedMode = useSyncExternalStore(subscribeFn, getSnapshot, getServerSnapshot);
+    const [mode, setMode] = useState(storedMode);
 
     const toggleTheme = () => {
         setMode((prev) => {

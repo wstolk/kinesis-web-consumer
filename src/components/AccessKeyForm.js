@@ -1,5 +1,5 @@
 // components/AccessKeyForm.js
-import React, {useState} from 'react';
+import React, {useState, useSyncExternalStore} from 'react';
 import {TextField, Button, Box, Typography, MenuItem, Collapse, ButtonBase} from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
@@ -10,15 +10,18 @@ import {
 } from '@/lib/constants';
 import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
+const subscribeFn = () => () => {};
+const getFormSnapshot = () => safeGetJSON('kinesisFormData');
+const getFormServerSnapshot = () => null;
+
 const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
-    const cachedForm = safeGetJSON('kinesisFormData');
-    const defaultStream = cachedForm?.streamName || (streams?.length > 0 ? streams[0] : '');
-    const [streamName, setStreamName] = useState(defaultStream);
+    const cachedForm = useSyncExternalStore(subscribeFn, getFormSnapshot, getFormServerSnapshot);
+    const [streamName, setStreamName] = useState(() => cachedForm?.streamName || '');
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [messageLimit, setMessageLimit] = useState(cachedForm?.messageLimit || DEFAULT_MESSAGE_LIMIT);
+    const [messageLimit, setMessageLimit] = useState(() => cachedForm?.messageLimit || DEFAULT_MESSAGE_LIMIT);
     const [minutesAgo, setMinutesAgo] = useState(DEFAULT_MINUTES_AGO);
-    const [shardIteratorType, setShardIteratorType] = useState(cachedForm?.shardIteratorType || 'TRIM_HORIZON');
-    const [partitionKey, setPartitionKey] = useState(cachedForm?.partitionKey || '');
+    const [shardIteratorType, setShardIteratorType] = useState(() => cachedForm?.shardIteratorType || 'TRIM_HORIZON');
+    const [partitionKey, setPartitionKey] = useState(() => cachedForm?.partitionKey || '');
 
     // When streams arrive and no stream is selected, pick the first one
     if (streams?.length > 0 && !streamName) {

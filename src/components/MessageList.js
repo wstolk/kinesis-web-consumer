@@ -8,6 +8,8 @@ import {
     Menu,
     MenuItem,
     Tooltip,
+    Fade,
+    Collapse,
     useTheme,
     alpha,
 } from '@mui/material';
@@ -21,6 +23,73 @@ import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
 import ViewAgendaOutlinedIcon from '@mui/icons-material/ViewAgendaOutlined';
 import { List as VirtualList } from 'react-window';
 import { POLLING_INTERVALS } from '@/lib/constants';
+
+const CHART_HEIGHT = 96;
+
+const BAR_WIDTH = 16;
+const BAR_GAP = 3;
+
+const BatchChart = React.memo(({ batches, theme }) => {
+    if (!batches || batches.length === 0) return null;
+
+    const maxCount = Math.max(...batches.map(b => b.count), 1);
+    const stripWidth = batches.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP;
+
+    return (
+        <Box
+            sx={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'flex-end',
+                height: CHART_HEIGHT,
+                mb: 0.75,
+                px: 0.5,
+                bgcolor: 'surface.main',
+                borderRadius: '4px',
+                border: '1px solid',
+                borderColor: 'surface.border',
+                overflow: 'hidden',
+            }}
+        >
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: `${BAR_GAP}px`,
+                    width: stripWidth,
+                    transition: 'width 300ms ease-out',
+                    flexShrink: 0,
+                }}
+            >
+                {batches.map((batch, i) => {
+                    const height = Math.max(2, (batch.count / maxCount) * (CHART_HEIGHT - 8));
+                    const isLatest = i === batches.length - 1;
+                    return (
+                        <Tooltip
+                            key={batch.time}
+                            title={`${batch.count} records — ${new Date(batch.time).toLocaleTimeString()}`}
+                            placement="top"
+                            arrow
+                        >
+                            <Box
+                                sx={{
+                                    width: BAR_WIDTH,
+                                    flexShrink: 0,
+                                    height,
+                                    bgcolor: isLatest ? 'primary.main' : alpha(theme.palette.primary.main, 0.4),
+                                    borderRadius: '2px 2px 0 0',
+                                    transition: 'height 200ms ease-out, background-color 200ms ease-out',
+                                }}
+                            />
+                        </Tooltip>
+                    );
+                })}
+            </Box>
+        </Box>
+    );
+});
+
+BatchChart.displayName = 'BatchChart';
 
 const TABLE_ROW_HEIGHT = 44;
 const CARD_ROW_HEIGHT = 80;
@@ -246,7 +315,8 @@ const MessageList = ({
     pollInterval,
     onUpdatePollingInterval,
     pollStats,
-    isAuthenticated
+    isAuthenticated,
+    batchHistory,
 }) => {
     const [partitionKeyFilter, setPartitionKeyFilter] = useState('');
     const [shardIdFilter, setShardIdFilter] = useState('');
@@ -545,8 +615,13 @@ const MessageList = ({
                 </Box>
             </Box>
 
+            {/* Batch volume chart */}
+            <Collapse in={batchHistory && batchHistory.length > 0} timeout={300} unmountOnExit>
+                <BatchChart batches={batchHistory} theme={theme} />
+            </Collapse>
+
             {/* Message List */}
-            {sortedAndFilteredMessages.length > 0 ? (
+            <Fade in={sortedAndFilteredMessages.length > 0} timeout={250} unmountOnExit>
                 <Box ref={listContainerRef}>
                     {viewMode === 'table' && <TableHeader theme={theme} />}
                     <VirtualList
@@ -564,7 +639,8 @@ const MessageList = ({
                         }}
                     />
                 </Box>
-            ) : (
+            </Fade>
+            <Fade in={sortedAndFilteredMessages.length === 0} timeout={400} unmountOnExit>
                 <Box sx={{ textAlign: 'center', py: 8 }}>
                     <Typography variant="body1" sx={{ color: 'text.secondary' }}>
                         No messages yet
@@ -573,7 +649,7 @@ const MessageList = ({
                         Connect to a stream to start viewing data
                     </Typography>
                 </Box>
-            )}
+            </Fade>
         </Box>
     );
 };
