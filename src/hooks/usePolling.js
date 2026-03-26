@@ -107,7 +107,7 @@ export const usePolling = (pollId = 'default') => {
         // If actively polling, also update the service's scheduled timer
         pollingService.updateInterval(pollId, newInterval);
         loggingService.log('info', `Updated polling interval to ${newInterval}ms`);
-    }, [pollId]);
+    }, [pollId, setPollInterval]);
 
     /**
      * Toggle polling on/off

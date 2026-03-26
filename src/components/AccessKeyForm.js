@@ -1,5 +1,5 @@
 // components/AccessKeyForm.js
-import React, {useState, useEffect} from 'react';
+import React, {useState, useSyncExternalStore} from 'react';
 import {TextField, Button, Box, Typography, MenuItem, Collapse, ButtonBase} from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
@@ -10,26 +10,18 @@ import {
 } from '@/lib/constants';
 import {safeGetJSON, safeSetJSON} from '@/lib/safeStorage';
 
-const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
-    const [streamName, setStreamName] = useState('');
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [messageLimit, setMessageLimit] = useState(DEFAULT_MESSAGE_LIMIT);
-    const [minutesAgo, setMinutesAgo] = useState(DEFAULT_MINUTES_AGO);
-    const [shardIteratorType, setShardIteratorType] = useState('TRIM_HORIZON');
-    const [partitionKey, setPartitionKey] = useState('');
+const subscribeFn = () => () => {};
+const getFormSnapshot = () => safeGetJSON('kinesisFormData');
+const getFormServerSnapshot = () => null;
 
-    // Restore cached form data after hydration
-    useEffect(() => {
-        const cachedForm = safeGetJSON('kinesisFormData');
-        if (cachedForm) {
-            if (cachedForm.streamName) setStreamName(cachedForm.streamName);
-            if (cachedForm.messageLimit) setMessageLimit(cachedForm.messageLimit);
-            if (cachedForm.shardIteratorType) setShardIteratorType(cachedForm.shardIteratorType);
-            if (cachedForm.partitionKey) setPartitionKey(cachedForm.partitionKey);
-        } else if (streams?.length > 0) {
-            setStreamName(streams[0]);
-        }
-    }, []);
+const AccessKeyForm = ({onSubmit, isLoading, streams}) => {
+    const cachedForm = useSyncExternalStore(subscribeFn, getFormSnapshot, getFormServerSnapshot);
+    const [streamName, setStreamName] = useState(() => cachedForm?.streamName || '');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [messageLimit, setMessageLimit] = useState(() => cachedForm?.messageLimit || DEFAULT_MESSAGE_LIMIT);
+    const [minutesAgo, setMinutesAgo] = useState(DEFAULT_MINUTES_AGO);
+    const [shardIteratorType, setShardIteratorType] = useState(() => cachedForm?.shardIteratorType || 'TRIM_HORIZON');
+    const [partitionKey, setPartitionKey] = useState(() => cachedForm?.partitionKey || '');
 
     // When streams arrive and no stream is selected, pick the first one
     if (streams?.length > 0 && !streamName) {
